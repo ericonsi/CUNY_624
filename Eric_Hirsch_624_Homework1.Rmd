@@ -1,0 +1,27 @@
+---
+title: "Eric_Hirsch_624_Homework_1"
+output: html_document
+date: "2023-01-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(ggplot2)
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(forecast)
+library(fpp2)
+
+visitors
+
+gafa_stock1 <- as_tsibble(gafa_stock)
+
+autoplot(gafa_stock) +
+  ggtitle("Daily Opening Price for Stocks Traded, 2014 - 2018")
+```
+
