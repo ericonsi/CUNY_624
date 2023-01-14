@@ -59,4 +59,38 @@ tsGF
 
 ```
 
+```{r}
+
+tute1 <- readr::read_csv("tute1.csv")
+View(tute1)
+
+mytimeseries <- tute1 %>%
+  mutate(Quarter = yearquarter(Quarter)) %>%
+  as_tsibble(index = Quarter)
+
+#without facet_grid
+g <- mytimeseries %>%
+  pivot_longer(-Quarter) %>%
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  ggtitle("No facet_grid")
+g
+
+#with facet_grid
+g1 <- g +  facet_grid(name ~ ., scales = "free_y") +
+  ggtitle("Has facet_grid")
+g1
+
+```
+
+Create time plots of the following four time series: Bricks from aus_production, Lynx from pelt, Close from gafa_stock, Demand from vic_elec.
+
+Use ? (or help()) to find out about the data in each series.
+For the last plot, modify the axis labels and title.
+
+```{r}
+
+
+
+```
 
