@@ -36,6 +36,22 @@ Explore <- function(ts)
   interval(ts)
 }
 
+timePlot <- function(ts, x, y, color) {
+  
+g <- ts %>%
+  pivot_longer(-x) %>%
+  ggplot(aes_string(x = pivot, y = y, color = color)) +
+  geom_line() +
+  ggtitle("No facet_grid") +  
+  facet_grid(name ~ ., scales = "free_y") 
+
+return (g)
+  
+}
+
+```
+```{r}
+
 Explore(gafa_stock)
 Explore(vic_elec)
 Explore(pelt)
