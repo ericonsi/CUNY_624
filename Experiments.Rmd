@@ -13,7 +13,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 * What is the time interval of each series?
 
 ```{r}
-
 library(tidyverse)
 library(tsibbledata)
 library(tsibble)
@@ -21,6 +20,40 @@ library(forecast)
 library(fpp2)
 library(fable)
 
+```
+
+```{r}
+
+dfCSD1 <- readr::read_csv("CSD1.csv") %>%
+  mutate(DateOfService=as.Date(DateOfService), Month=yearmonth(DateOfService)) %>%
+  rename(Count=CountOfServiceID) %>%
+  group_by(Month) %>%
+  summarize(Count=sum(Count))
+
+tsCSD1 <- as_tsibble(dfCSD1, index=Month)
+
+#TimePlot
+autoplot(tsCSD1)
+
+#without facet_grid
+g <- mytimeseries %>%
+  pivot_longer(-Quarter) %>%
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  ggtitle("No facet_grid")
+g
+
+#with facet_grid
+g1 <- g +  facet_grid(name ~ ., scales = "free_y") +
+  ggtitle("Has facet_grid")
+g1
+
+
+
+```
+
+
+```{r}
 Explore <- function(ts)
 {
   x <- deparse(substitute(ts))
