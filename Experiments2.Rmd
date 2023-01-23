@@ -18,6 +18,7 @@ library(forecast)
 library(fpp2)
 library(fpp3)
 library(fable)
+library(EHData)
 
 Explore <- function(ts)
 {
@@ -75,15 +76,40 @@ tsCSD <- dfCSD %>%
   summarize(TotalServices = sum(CountOfServiceID)) %>%
   as_tsibble(index = Month)
 
+tsCSD2 <- dfCSD %>%
+  mutate(Month = yearmonth(DateOfService)) %>%
+  group_by(Month, Program) %>%
+  summarize(TotalServices = sum(CountOfServiceID)) %>%
+  as_tsibble(index = Month, key=Program) %>%
+  fill_gaps()
+
+tsCSD_Bup <- tsCSD2 %>%
+  filter(Program=="Buprenorphine")
+  
 autoplot(tsCSD)
+autoplot(tsCSD2)
+autoplot(tsCSD_Bup)
 
 gg_season(tsCSD, TotalServices, labels = "both") +
   labs(y = "#",
-       title = "Seasonal plot: Total Services")
+       title = "Seasonal plot: Total Services") 
+
+gg_season(tsCSD_Bup, TotalServices, labels = "both") +
+  labs(y = "#",
+       title = "Seasonal plot: Bup: Total Services") 
 
 ACF(tsCSD, lag_max = 9) %>% autoplot()
+ACF(tsCSD_Bup, lag_max = 9) %>% autoplot()
 
 tsCSD %>%
+  model(
+    STL(TotalServices ~ trend(window = 7) +
+                   season(window = "periodic"),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+
+tsCSD_Bup %>%
   model(
     STL(TotalServices ~ trend(window = 7) +
                    season(window = "periodic"),
