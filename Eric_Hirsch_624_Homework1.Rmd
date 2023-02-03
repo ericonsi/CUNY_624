@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 Exercises 2.1-2.5 and 2.8
 
-1. Use the help function to explore what the series gafa_stock, PBS, vic_elec and pelt represent.
+2.1. Use the help function to explore what the series gafa_stock, PBS, vic_elec and pelt represent.
 * Use autoplot() to plot some of the series in these data sets.
 * What is the time interval of each series?
 
@@ -48,7 +48,7 @@ Explore(PBS_A01)
 
 ```
 
-2. Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.
+2.2. Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.
 
 ```{r}
 
@@ -61,10 +61,11 @@ tsGF
 
 ```
 
+2.3 Check what happens when you don’t include facet_grid().
+
 ```{r}
 
 tute1 <- readr::read_csv("tute1.csv")
-View(tute1)
 
 mytimeseries <- tute1 %>%
   mutate(Quarter = yearquarter(Quarter)) %>%
@@ -85,12 +86,53 @@ g1
 
 ```
 
-Create time plots of the following four time series: Bricks from aus_production, Lynx from pelt, Close from gafa_stock, Demand from vic_elec.
+2.4 The USgas package contains data on the demand for natural gas in the US.
 
-Use ? (or help()) to find out about the data in each series.
-For the last plot, modify the axis labels and title.
+Install the USgas package.
+Create a tsibble from us_total with year as the index and state as the key.
+Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).
 
 ```{r}
+states = c("Maine", "Vermont", "New Hampshire", "Massachusetts", "Connecticut", "Rhode Island")
+
+tsUSGas_NE <- as_tsibble(USgas::us_total, index=year, key=state) %>%
+  filter(state==states)
+
+autoplot(tsUSGas_NE)
+  
+
+  
+
+
+```
+
+
+2.5 Download tourism.xlsx from the book website and read it into R using readxl::read_excel().
+
+Create a tsibble which is identical to the tourism tsibble from the tsibble package.
+
+Find what combination of Region and Purpose had the maximum number of overnight trips on average.
+
+Create a new tsibble which combines the Purposes and Regions, and just has total trips by State.
+
+
+```{r}
+
+dfTourism <- readxl::read_excel("tourism.xlsx")
+head(dfTourism)
+
+head(tsibble::tourism)
+
+tsTourism <- dfTourism %>%
+  mutate(Quarter =yearquarter(Quarter)) %>%
+  as_tsibble(key = c(Region, State, Purpose), index = Quarter)
+
+tsTourismMax <- tsTourism %>%
+  group_by(Region, Purpose) %>%
+  summarize(AveTrips = mean(Trips))
+
+tsTourismMax
+
 
 
 
