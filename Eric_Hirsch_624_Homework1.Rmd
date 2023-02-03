@@ -127,14 +127,20 @@ tsTourism <- dfTourism %>%
   mutate(Quarter =yearquarter(Quarter)) %>%
   as_tsibble(key = c(Region, State, Purpose), index = Quarter)
 
-tsTourismMax <- tsTourism %>%
+dfTourismdf <- as.tibble(tsTourism)
+
+dfTourismMax <- dfTourismdf %>%
   group_by(Region, Purpose) %>%
-  summarize(AveTrips = mean(Trips))
+  summarize(AveTrips = mean(Trips)) %>%
+  arrange(desc(AveTrips))
 
-tsTourismMax
+dfTourismMax
 
-
-
+tsTourismSimple <- tsTourism %>%
+  group_by(State) %>%
+  summarize(Trips = sum(Trips)) %>%
+    as_tsibble(key = State, index = Quarter)
+  
 
 ```
 
