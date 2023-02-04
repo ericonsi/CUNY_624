@@ -1,0 +1,67 @@
+---
+title: "Eric_Hirsch_624_Homework_2"
+output: html_document
+date: "2023-01-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(forecast)
+library(fpp3)
+library(fable)
+
+```
+
+Exercises 1,2,3,4,5,7,8,9
+
+__*3.1 Consider the GDP information in global_economy. Plot the GDP per capita for each country over time. Which country has the highest GDP per capita? How has this changed over time?*__
+
+```{r}
+
+global_economy_PerCapita <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  select(GDPperCapita) %>%
+  drop_na()
+
+  global_economy_PerCapita %>% autoplot()
+  
+```
+
+3.2 __*For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy, slaughter of Victorian “Bulls, bullocks and steers” in aus_livestock, Victorian Electricity Demand from vic_elec, Gas production from aus_production.__*
+
+
+```{r}
+
+ge_US <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  filter(Country=="United States") %>%
+  mutate(logGDPperCapita = log(GDPperCapita))
+
+ge_US %>% autoplot(logGDPperCapita)
+
+```
+```{r}
+
+
+aus_production %>%
+  autoplot(Gas)
+
+```
+```{r}
+
+ge_US <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  filter(Country=="United States") 
+
+ge_US %>%
+  autoplot(GDPperCapita)
+
+```
+

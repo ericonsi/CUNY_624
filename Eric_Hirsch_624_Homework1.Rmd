@@ -1,7 +1,7 @@
 ---
 title: "Eric_Hirsch_624_Homework_1"
 output: html_document
-date: "2023-01-09"
+date: "2023-02-04"
 ---
 
 ```{r setup, include=FALSE}
@@ -10,9 +10,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 Exercises 2.1-2.5 and 2.8
 
-2.1. Use the help function to explore what the series gafa_stock, PBS, vic_elec and pelt represent.
-* Use autoplot() to plot some of the series in these data sets.
-* What is the time interval of each series?
+__*2.1. Use the help function to explore what the series gafa_stock, PBS, vic_elec and pelt represent. Use autoplot() to plot some of the series in these data sets. What is the time interval of each series?*__
 
 ```{r}
 
@@ -36,32 +34,51 @@ Explore <- function(ts)
 }
 
 ```
+
+a. Gafa_Stock is historical stock prices from 2014-2018 for Google, Amazon, Facebook and Apple.
+
+The interval is a day - however, as it is stock prices, only weekdays appear in the time series.
+
 ```{r}
-
+gafa_stock_NoGaps <- gafa_stock %>% fill_gaps() %>% as_tsibble(index=Date)
 Explore(gafa_stock)
-Explore(vic_elec)
-Explore(pelt)
+```
 
+b. vic_elec is half-hourly electricity demand for Victoria, Australia.  The interval is 30m.
+
+```{r}
+Explore(vic_elec)
+```
+c. pelt is a set of Hudson Bay Company trading records for furs from 1845 to 1935.  The interval is yearly.
+```{r}
+Explore(pelt)
+```
+
+d. PBS is Monthly medicare Australia prescription data.  The interval is monthly.There is too much data to display in one time plot so we filter for one type of script (as shown in the textbook).
+```{r}
 head(PBS)
 PBS_A01 <- PBS %>% filter(ATC2 == "A01")
 Explore(PBS_A01)
 
 ```
 
-2.2. Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.
+*__2.2. Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.__*
 
 ```{r}
 
 tsGF <- gafa_stock %>%
   group_by(Symbol) %>%
-  dplyr::filter(Close == max(Close))
+  dplyr::filter(Close == max(Close)) %>%
+  select(Close)
 
 tsGF
 
 
 ```
 
-2.3 Check what happens when you don’t include facet_grid().
+__*2.3 Using the tute1 dataset from the book, compare the timeplots when you do and don’t include facet_grid().*__
+
+Facet_grid allows each timeplot to have it's own scale.  The look is also tighter.
 
 ```{r}
 
@@ -86,12 +103,9 @@ g1
 
 ```
 
-2.4 The USgas package contains data on the demand for natural gas in the US.
+*__2.4 The USgas package contains data on the demand for natural gas in the US. Install the USgas package. Create a tsibble from us_total with year as the index and state as the key. Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).__*
 
-Install the USgas package.
-Create a tsibble from us_total with year as the index and state as the key.
-Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).
-
+The data here would be more interesting if calculated per capita.
 ```{r}
 states = c("Maine", "Vermont", "New Hampshire", "Massachusetts", "Connecticut", "Rhode Island")
 
@@ -99,22 +113,11 @@ tsUSGas_NE <- as_tsibble(USgas::us_total, index=year, key=state) %>%
   filter(state==states)
 
 autoplot(tsUSGas_NE)
-  
-
-  
-
 
 ```
 
 
-2.5 Download tourism.xlsx from the book website and read it into R using readxl::read_excel().
-
-Create a tsibble which is identical to the tourism tsibble from the tsibble package.
-
-Find what combination of Region and Purpose had the maximum number of overnight trips on average.
-
-Create a new tsibble which combines the Purposes and Regions, and just has total trips by State.
-
+*__2.5 Download tourism.xlsx from the book website and read it into R using readxl::read_excel().  Create a tsibble which is identical to the tourism tsibble from the tsibble package.__*
 
 ```{r}
 
@@ -126,6 +129,14 @@ head(tsibble::tourism)
 tsTourism <- dfTourism %>%
   mutate(Quarter =yearquarter(Quarter)) %>%
   as_tsibble(key = c(Region, State, Purpose), index = Quarter)
+```
+
+
+__*2.5a. Find what combination of Region and Purpose had the maximum number of overnight trips on average.*__
+
+Since we need to remove the index as part of the group, I turned the tsibble into a tibble for this analysis.
+
+```{r}
 
 dfTourismdf <- as.tibble(tsTourism)
 
@@ -136,31 +147,45 @@ dfTourismMax <- dfTourismdf %>%
 
 dfTourismMax
 
+
+```
+*__2.5b. Create a new tsibble which combines the Purposes and Regions, and just has total trips by State.__*
+
+Since the answer is to be a tsibble, I retained the Quarter even though the question did not explicitly ask for it.
+
+```{r}
+
+
 tsTourismSimple <- tsTourism %>%
   group_by(State) %>%
   summarize(Trips = sum(Trips)) %>%
     as_tsibble(key = State, index = Quarter)
   
-
+tsTourismSimple
 ```
-8. Monthly Australian retail data is provided in aus_retail. Select one of the time series as follows (but choose your own seed value):
 
-set.seed(12345678)
-myseries <- aus_retail %>%
-  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
-Explore your chosen retail time series using the following functions:
 
-autoplot(), gg_season(), gg_subseries(), gg_lag(),
+*__8. Monthly Australian retail data is provided in aus_retail. Select one of the time series as follows (but choose your own seed value):__*
 
-ACF() %>% autoplot()
+*__Explore your chosen retail time series using the following functions: autoplot(), gg_season(), gg_subseries(), gg_lag(), ACF() %>% autoplot().  Can you spot any seasonality, cyclicity and trend? What do you learn about the series?__*
 
-Can you spot any seasonality, cyclicity and trend? What do you learn about the series?
+Trend: There is a clear upward trend through the upward 2010s - after which the trend reverses briefly and then there appears to be white noise.  This is evident both from the timeplot and from the acf (which shows a strong relationship decreasing over time).  An acf plot from 2014 on shows much lower correlation (and a stronger seasonal trend).\
+\
+Seasonality: There is a slight tendency to see higher turnover in the summer months.  This tendency has become more pronounced in recent years. We can see from the seasonal subplots that average turnover shows a mild seasonal pattern, but when we look at peak monthly turnover the pattern is even stronger.\
+\
+The trend is strong enough to pick up in the acf, but not in the lag plots.\
+\
+Cyclicality: There is possibly a slight cyclical tendency every 10 years or so - we see a peak and then drop.
+
+
+
 
 ```{r}
 
 set.seed(042760)
 myseries <- aus_retail %>%
-  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+  fill_gaps()
 
 ```
 
@@ -169,10 +194,19 @@ myseries <- aus_retail %>%
 autoplot(myseries)
 gg_season(myseries) 
 gg_subseries(myseries)
-gg_lag(myseries)
+gg_lag(myseries, lags=1:12)
 
-myseries %>% ACF(Turnover) %>% autoplot()
+myseries %>% ACF(Turnover) %>% autoplot() + labs(title="Turnover - entire series")
+
+
+library(lubridate)
+myseries2 <- myseries %>%
+  filter(year(Month) >= 2014)
+
+myseries2 %>% ACF(Turnover) %>% autoplot() + labs(title="Turnover - 2014+")
 
 ```
+
+
 
 
