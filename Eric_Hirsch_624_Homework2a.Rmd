@@ -1,0 +1,85 @@
+---
+title: "Eric_Hirsch_624_Homework_2"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(forecast)
+library(fpp3)
+library(fable)
+
+```
+
+Exercises 1,2,3,4,5,7,8,9
+
+__*3.1 Consider the GDP information in global_economy. Plot the GDP per capita for each country over time.__*
+
+There are too many time series to fit legibly on one plot.  We can see, however, a general trend up.
+
+```{r}
+
+global_economy_PerCapita <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  select(GDPperCapita) %>%
+  drop_na()
+
+  global_economy_PerCapita %>% 
+    ggplot(aes(Year, GDPperCapita, group=Country)) +
+    geom_line()
+  
+```
+
+  __*1.b Which country has the highest GDP per capita? How has this changed over time?*__
+  
+We filter GDP per capita at 80,000 and find that Monaco has the highest GDP per capita, and has since the 1990s, with some brief exceptions when Liechtenstein led GDP per capita.
+  
+```{r}
+
+global_economy_PerCapita2 <- global_economy_PerCapita %>%
+  filter(GDPperCapita>=80000)
+
+global_economy_PerCapita2 %>% autoplot()
+
+```
+  
+
+__*2. For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy__*
+
+
+```{r}
+
+ge_US <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  filter(Country=="United States") %>%
+  mutate(logGDPperCapita = log(GDPperCapita))
+
+ge_US %>% autoplot(logGDPperCapita)
+
+```
+```{r}
+
+
+aus_production %>%
+  autoplot(Gas)
+
+```
+```{r}
+
+ge_US <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  filter(Country=="United States") 
+
+ge_US %>%
+  autoplot(GDPperCapita)
+
+```
+
