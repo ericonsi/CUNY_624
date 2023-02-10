@@ -1,0 +1,248 @@
+---
+title: "Eric_Hirsch_624_Homework_2"
+output: html_document
+date: "2023-01-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(forecast)
+library(fpp3)
+library(fable)
+
+```
+
+Exercises 1,2,3,4,5,7,8,9
+
+__*3.1 Consider the GDP information in global_economy. Plot the GDP per capita for each country over time. Which country has the highest GDP per capita? How has this changed over time?*__
+
+```{r}
+
+global_economy_PerCapita <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  select(GDPperCapita) %>%
+  drop_na()
+
+  global_economy_PerCapita %>% autoplot()
+  
+```
+
+3.2 __*For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy, slaughter of Victorian “Bulls, bullocks and steers” in aus_livestock, Victorian Electricity Demand from vic_elec, Gas production from aus_production.__*
+
+
+```{r}
+
+ge_US <- global_economy %>%
+  mutate(GDPperCapita = round(GDP/Population,0)) %>%
+  filter(Country=="United States") %>%
+  mutate(logGDPperCapita = log(GDPperCapita))
+
+ge_US %>% autoplot(GDPperCapita)
+ge_US %>% autoplot(logGDPperCapita)
+
+
+```
+
+```{r}
+aus_livestock2 <- aus_livestock %>%
+  filter(State == "Victoria", Animal=="Bulls, bullocks and steers")
+
+autoplot(aus_livestock2)
+
+lambda <- aus_livestock2 %>%
+  features(Count, features = guerrero) %>%
+  pull(lambda_guerrero)
+aus_livestock2 %>%
+  autoplot(box_cox(Count, lambda))
+
+lambda
+
+aus_livestock3 <- aus_livestock2 %>%
+  mutate(MovingAve = slider::slide_dbl(Count, mean, .before = 5, .after = 5, .complete =TRUE)) %>%
+  drop_na()
+ 
+aus_livestock3 %>% autoplot(Count) +
+ geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
+  labs(y = "Count",
+       title = "Selected Livestock from Victoria") +
+  guides(colour = guide_legend(title = "series"))
+
+```
+```{r}
+dfe <- as_tibble(vic_elec)
+
+vic_elec2 <- vic_elec %>%
+  select(Demand)
+  
+  autoplot(vic_elec2)
+  
+ vic_elec3 <- vic_elec2 %>%
+  mutate(MovingAve = slider::slide_dbl(Demand, mean, .before = 100, .after = 100, .complete =TRUE)) %>%
+  drop_na()
+
+ vic_elec3 %>% autoplot(Demand) +
+ geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
+  labs(y = "Count",
+       title = "Electricity Demand from Victoria") +
+  guides(colour = guide_legend(title = "series"))
+
+```
+
+
+```{r}
+autoplot(aus_production)
+
+lambda <- aus_production %>%
+  features(Gas, features = guerrero) %>%
+  pull(lambda_guerrero)
+aus_production %>%
+  autoplot(box_cox(Gas, lambda))
+
+lambda
+
+```
+```{r}
+head(canadian_gas)
+
+lambda <- canadian_gas %>%
+  features(Volume, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+autoplot(canadian_gas)
+
+canadian_gas %>%
+  autoplot(box_cox(Volume, lambda))
+
+lambda
+```
+3.4 What Box-Cox transformation would you select for your retail data (from Exercise 8 in Section 2.10)?
+
+```{r}
+
+set.seed(042760)
+myRetailseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+         
+autoplot(myRetailseries)
+
+lambda <- myRetailseries %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+myRetailseries %>%
+  autoplot(box_cox(Turnover, lambda))
+
+lambda
+
+```
+5. For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance. Tobacco from aus_production, Economy class passengers between Melbourne and Sydney from ansett, and Pedestrian counts at Southern Cross Station from pedestrian.
+
+```{r}
+
+
+lambda <- myseries %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+myseries %>%
+  autoplot(box_cox(Turnover, lambda))
+
+lambda
+
+```
+7. Consider the last five years of the Gas data from aus_production.
+
+Plot the time series. Can you identify seasonal fluctuations and/or a trend-cycle?
+
+The trend is upward - seasonality is very strong, peaking in the summer months.
+```{r}
+
+gas <- tail(aus_production, 5*4) %>% select(Gas)
+autoplot(gas)
+```
+
+Use classical_decomposition with type=multiplicative to calculate the trend-cycle and seasonal indices.
+
+```{r}
+
+gas %>%
+  model(
+    classical_decomposition(Gas, type = "multiplicative")
+  ) %>%
+  components() %>%
+  autoplot() +
+  labs(title = "Classical multiplicative decomposition of ustralian Gas Production")
+
+
+```
+
+Do the results support the graphical interpretation from part a?
+
+Yes, the results are supported.
+
+Compute and plot the seasonally adjusted data.
+
+```{r}
+
+ gas2 <- gas %>%
+  mutate(MovingAve = slider::slide_dbl(Gas, mean, .before =2, .after = 2, .complete =TRUE)) %>%
+  drop_na()
+
+gas2 %>% autoplot(Gas) +
+ geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
+  labs(y = "Count",
+       title = "Gas Demand") +
+  guides(colour = guide_legend(title = "series"))
+
+
+```
+
+Change one observation to be an outlier (e.g., add 300 to one observation), and recompute the seasonally adjusted data. What is the effect of the outlier?  Does it make any difference if the outlier is near the end rather than in the middle of the time series?
+
+```{r}
+
+gas_out <- gas2 %>%
+  mutate(Gas2=ifelse(as.character(Quarter)=="2007 Q4", 300, Gas)) %>%
+  mutate(Gas3=ifelse(as.character(Quarter)=="2006 Q1", 700, Gas))
+  
+ gasout2 <- gas_out %>%
+  mutate(MovingAve2 = slider::slide_dbl(Gas2, mean, .before =2, .after = 2, .complete =TRUE)) %>%
+   mutate(MovingAve3 = slider::slide_dbl(Gas3, mean, .before =2, .after = 2, .complete =TRUE)) %>%
+  drop_na()
+
+gasout2 %>% autoplot(Gas) +
+ geom_line(aes(y = MovingAve2), colour = "#00FF00", size=1.5) +
+  geom_line(aes(y = MovingAve3), colour = "#FF0000", size=1.5) +
+ geom_line(aes(y = MovingAve), colour = "#0000FF", size=1.5) +
+  labs(y = "Count",
+       title = "Gas Demand") +
+  guides(colour = guide_legend(title = "series"))
+
+```
+
+
+8. Recall your retail time series data (from Exercise 8 in Section 2.10). Decompose the series using X-11. Does it reveal any outliers, or unusual features that you had not noticed previously?
+
+```{r}
+x11_dcmp <- myRetailseries %>%
+  model(x11 = X_13ARIMA_SEATS(Turnover ~ x11())) %>%
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+    "Decomposition of turnover in Australian retail employment using X-11.")
+
+
+```
+
+The decomposition reveals a number of things - seasonality is highest in the middle of the series, not the end as I had thought, and there are some significant outliers in the 1990s.
+
+9. Figures 3.19 and 3.20 show the result of decomposing the number of persons in the civilian labour force in Australia each month from February 1978 to August 1995. Write about 3–5 sentences describing the results of the decomposition. Pay particular attention to the scales of the graphs in making your interpretation.  Is the recession of 1991/1992 visible in the estimated components?
+
+
