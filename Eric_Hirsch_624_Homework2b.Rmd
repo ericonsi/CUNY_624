@@ -1,7 +1,7 @@
 ---
 title: "Eric_Hirsch_624_Homework_2"
 output: html_document
-date: "2023-01-09"
+date: "2023-02-10"
 ---
 
 ```{r setup, include=FALSE}
@@ -21,7 +21,9 @@ library(fable)
 
 Exercises 1,2,3,4,5,7,8,9
 
-__*3.1 Consider the GDP information in global_economy. Plot the GDP per capita for each country over time. Which country has the highest GDP per capita? How has this changed over time?*__
+__*1 Consider the GDP information in global_economy. Plot the GDP per capita for each country over time.__*
+
+There are too many time series to fit legibly on one plot.  We can see, however, a general trend up.
 
 ```{r}
 
@@ -29,38 +31,58 @@ global_economy_PerCapita <- global_economy %>%
   mutate(GDPperCapita = round(GDP/Population,0)) %>%
   select(GDPperCapita) %>%
   drop_na()
-
-  global_economy_PerCapita %>% autoplot()
+  
+  global_economy_PerCapita %>% autoplot(show.legend=FALSE)
   
 ```
 
-3.2 __*For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy, slaughter of Victorian “Bulls, bullocks and steers” in aus_livestock, Victorian Electricity Demand from vic_elec, Gas production from aus_production.__*
-
-
+*__1.b Which country has the highest GDP per capita? How has this changed over time?__*
+  
+We filter GDP per capita at 80,000 and find that Monaco has the highest GDP per capita, and has since the 1990s, with some brief exceptions when Liechtenstein led GDP per capita.
+  
 ```{r}
+
+global_economy_PerCapita2 <- global_economy_PerCapita %>%
+  filter(GDPperCapita>=80000)
+
+global_economy_PerCapita2 %>% autoplot()
+
+```
+  
+__*2. For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy*__
+
+The GDP per capita in the US appears to be increasing exponentially, so a log transformation seems appropriate.  In fact, the log transformation is somewhat, though not entirely, effective.
+
+
+```{r base plot, warning = FALSE, echo=FALSE, out.width="50%"}
 
 ge_US <- global_economy %>%
   mutate(GDPperCapita = round(GDP/Population,0)) %>%
   filter(Country=="United States") %>%
   mutate(logGDPperCapita = log(GDPperCapita))
 
-ge_US %>% autoplot(GDPperCapita)
-ge_US %>% autoplot(logGDPperCapita)
+ge_US %>% autoplot(GDPperCapita) + labs(title = "US GDP per Capita - no transformation")
+ge_US %>% autoplot(logGDPperCapita) +labs(title = "US GDP per capita - log transformation")
 
 
 ```
 
-```{r}
+__*2b. slaughter of Victorian “Bulls, bullocks and steers” in aus_livestock*__
+
+Here we can perform a box-cox transformation to create more linearity.  We can also perform a moving average (11 months works well here) to isolate the trend from the seasonality.
+
+
+```{r, warning = FALSE, echo=FALSE, out.width="25%"}
 aus_livestock2 <- aus_livestock %>%
   filter(State == "Victoria", Animal=="Bulls, bullocks and steers")
 
-autoplot(aus_livestock2)
+autoplot(aus_livestock2) + labs(title = "Victorian Livestock Slaughter - no transformation")
 
 lambda <- aus_livestock2 %>%
   features(Count, features = guerrero) %>%
   pull(lambda_guerrero)
 aus_livestock2 %>%
-  autoplot(box_cox(Count, lambda))
+  autoplot(box_cox(Count, lambda)) + labs(title = "Victorian Livestock Slaughter - boxcox (-.044)")
 
 lambda
 
@@ -71,17 +93,20 @@ aus_livestock3 <- aus_livestock2 %>%
 aus_livestock3 %>% autoplot(Count) +
  geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
   labs(y = "Count",
-       title = "Selected Livestock from Victoria") +
+       title = "Victorian Livestock Slaughter - moving average (11 months)") +
   guides(colour = guide_legend(title = "series"))
 
 ```
+
+*__2.c Victorian Electricity Demand from vic_elec__*
+
+For this dataset it is possible to do a moving average, but the variation renders it not very useful.  
+
 ```{r}
 dfe <- as_tibble(vic_elec)
 
 vic_elec2 <- vic_elec %>%
   select(Demand)
-  
-  autoplot(vic_elec2)
   
  vic_elec3 <- vic_elec2 %>%
   mutate(MovingAve = slider::slide_dbl(Demand, mean, .before = 100, .after = 100, .complete =TRUE)) %>%
@@ -90,24 +115,34 @@ vic_elec2 <- vic_elec %>%
  vic_elec3 %>% autoplot(Demand) +
  geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
   labs(y = "Count",
-       title = "Electricity Demand from Victoria") +
+       title = "Electricity Demand from Victoria with Moving Average (200 30m periods)") +
   guides(colour = guide_legend(title = "series"))
 
 ```
+*__3.c Gas production from aus_production.__*
 
+A boxcox with a .11 lambda helps make the curve more linear.
 
 ```{r}
-autoplot(aus_production)
+autoplot(aus_production) + labs(title = "Austrailian Gas Production - no transformation")
+
 
 lambda <- aus_production %>%
   features(Gas, features = guerrero) %>%
   pull(lambda_guerrero)
 aus_production %>%
-  autoplot(box_cox(Gas, lambda))
+  autoplot(box_cox(Gas, lambda))+ labs(title = "Austrailian Gas Production - Box-Cox (.11)")
+
 
 lambda
 
 ```
+
+__*3. Why is a Box-Cox transformation unhelpful for the canadian_gas data?*__
+
+A box cox transformation will make an uneven trend appear more linear.  The trend already appears linear.
+
+
 ```{r}
 head(canadian_gas)
 
@@ -115,14 +150,18 @@ lambda <- canadian_gas %>%
   features(Volume, features = guerrero) %>%
   pull(lambda_guerrero)
 
-autoplot(canadian_gas)
+autoplot(canadian_gas)+ labs(title = "Canadian Gas Production - No Transformation")
+
 
 canadian_gas %>%
-  autoplot(box_cox(Volume, lambda))
+  autoplot(box_cox(Volume, lambda)) + labs(title = "Austrailian Gas Production - Box-Cox")
+
 
 lambda
 ```
-3.4 What Box-Cox transformation would you select for your retail data (from Exercise 8 in Section 2.10)?
+__*4.  What Box-Cox transformation would you select for your retail data (from Exercise 8 in Section 2.10)?*__
+
+Using guerrerro, the best lambda is .22.  The difference is moderate, smoothing out the large jump toward the end of the year.
 
 ```{r}
 
@@ -130,7 +169,22 @@ set.seed(042760)
 myRetailseries <- aus_retail %>%
   filter(`Series ID` == sample(aus_retail$`Series ID`,1))
          
-autoplot(myRetailseries)
+autoplot(myRetailseries) + labs(title = "No Transformation")
+
+lambda <- myRetailseries %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+myRetailseries %>%
+  autoplot(box_cox(Turnover, lambda)) + labs(title = "Box-Cox")
+
+lambda
+
+```
+5. For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance. Tobacco from aus_production, Economy class passengers between Melbourne and Sydney from ansett, and Pedestrian counts at Southern Cross Station from pedestrian.
+
+```{r}
+
 
 lambda <- myRetailseries %>%
   features(Turnover, features = guerrero) %>%
@@ -142,22 +196,7 @@ myRetailseries %>%
 lambda
 
 ```
-5. For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance. Tobacco from aus_production, Economy class passengers between Melbourne and Sydney from ansett, and Pedestrian counts at Southern Cross Station from pedestrian.
-
-```{r}
-
-
-lambda <- myseries %>%
-  features(Turnover, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-myseries %>%
-  autoplot(box_cox(Turnover, lambda))
-
-lambda
-
-```
-7. Consider the last five years of the Gas data from aus_production.
+__*7. Consider the last five years of the Gas data from aus_production.*__
 
 Plot the time series. Can you identify seasonal fluctuations and/or a trend-cycle?
 
@@ -168,7 +207,7 @@ gas <- tail(aus_production, 5*4) %>% select(Gas)
 autoplot(gas)
 ```
 
-Use classical_decomposition with type=multiplicative to calculate the trend-cycle and seasonal indices.
+__*7.b Use classical_decomposition with type=multiplicative to calculate the trend-cycle and seasonal indices.*__
 
 ```{r}
 
@@ -178,16 +217,16 @@ gas %>%
   ) %>%
   components() %>%
   autoplot() +
-  labs(title = "Classical multiplicative decomposition of ustralian Gas Production")
+  labs(title = "Classical multiplicative decomposition of Australian Gas Production")
 
 
 ```
 
-Do the results support the graphical interpretation from part a?
+__*7.c Do the results support the graphical interpretation from part a?*__
 
 Yes, the results are supported.
 
-Compute and plot the seasonally adjusted data.
+__*7.d Compute and plot the seasonally adjusted data.*__
 
 ```{r}
 
