@@ -110,6 +110,8 @@ __*2.1 Produce a time plot of the series.*__
 x<- gafa_stock
 fb <- gafa_stock %>%
   filter(Symbol=="FB") %>%
+  mutate(day = row_number()) %>%
+  update_tsibble(index = day, regular = TRUE) %>%
   select(Close)
 
 fb %>% autoplot(Close)
@@ -120,8 +122,8 @@ __*2.b Produce forecasts using the drift method and plot them.*__
 
 ```{r}
 
-fit <- fb %>% model(RW(Close~drift()))
-#fit %>% gg_tsresiduals()
+fit <- fb %>% model(NAIVE(Close~drift()))
+fit %>% gg_tsresiduals()
 fit %>% forecast() %>% autoplot(fb)
 
 ```
