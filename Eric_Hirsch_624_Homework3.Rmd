@@ -118,18 +118,26 @@ fb %>% autoplot(Close)
 
 ```
 
-__*2.b Produce forecasts using the drift method and plot them.*__
+__*2.b Produce forecasts using the drift method and plot them. Show that the forecasts are identical to extending the line drawn between the first and last observations.*__
 
 ```{r}
-
-fit <- fb %>% model(NAIVE(Close~drift()))
-fit %>% gg_tsresiduals()
+fit <- fb %>% model(NAIVE(Close))
+#fit %>% gg_tsresiduals()
 fit %>% forecast() %>% autoplot(fb)
+
+head(fb$Close,1)
+tail(fb$Close,1)
+
+fb %>%
+  model(RW(Close ~ drift())) %>%
+  forecast(h=100) %>%
+  autoplot(fb) +
+  labs(title = "Daily Open Price of Facebook", y = "USD") +
+  geom_segment(aes(x=0, xend=1250, y=54.71, yend = 131.09),
+               colour = "red")
 
 ```
 
-
-Show that the forecasts are identical to extending the line drawn between the first and last observations.
 Try using some of the other benchmark functions to forecast the same data set. Which do you think is best? Why?
 
 ```{r}
