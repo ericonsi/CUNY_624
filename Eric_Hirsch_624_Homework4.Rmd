@@ -40,7 +40,6 @@ str(dfGlass)
 
 ```{r}
 
-
 w <- EHSummarize_SingleColumn_Boxplots(dfGlass)
 x <- EHSummarize_SingleColumn_Histograms(dfGlass)
 
@@ -51,4 +50,9 @@ a <- EHExplore_Multicollinearity(dfGlass, threshold=.6, printHighest = TRUE)
 
 ```
 
+```{r}
+
+EHModel_Regression_StandardLM(dfGlass, "Type")
+
+```
 
