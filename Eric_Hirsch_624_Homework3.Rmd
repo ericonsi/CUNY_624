@@ -49,7 +49,6 @@ bricks <- aus_production %>%
 bricks %>% autoplot()
 
 fit <- bricks %>% model(SNAIVE())
-fit %>% gg_tsresiduals()
 fit %>% forecast() %>% autoplot(bricks)
 
 
@@ -118,13 +117,9 @@ fb %>% autoplot(Close)
 
 ```
 
-__*2.b Produce forecasts using the drift method and plot them. Show that the forecasts are identical to extending the line drawn between the first and last observations.*__
+__*2.b_c Produce forecasts using the drift method and plot them. Show that the forecasts are identical to extending the line drawn between the first and last observations.*__
 
 ```{r}
-fit <- fb %>% model(NAIVE(Close))
-#fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(fb)
-
 head(fb$Close,1)
 tail(fb$Close,1)
 
@@ -132,315 +127,116 @@ fb %>%
   model(RW(Close ~ drift())) %>%
   forecast(h=100) %>%
   autoplot(fb) +
-  labs(title = "Daily Open Price of Facebook", y = "USD") +
+  labs(title = "Daily Close Price for Facebook") +
   geom_segment(aes(x=0, xend=1250, y=54.71, yend = 131.09),
                colour = "red")
 
 ```
 
-Try using some of the other benchmark functions to forecast the same data set. Which do you think is best? Why?
+__* 2.d Try using some of the other benchmark functions to forecast the same data set. Which do you think is best? Why?*__
 
 ```{r}
+fb %>%
+  model(NAIVE()) %>%
+  forecast(h=100) %>%
+  autoplot(fb)
 
-global_economy_PerCapita <- global_economy %>%
-  mutate(GDPperCapita = round(GDP/Population,0)) %>%
-  select(GDPperCapita) %>%
-  drop_na()
-  
-  global_economy_PerCapita %>% autoplot(show.legend=FALSE)
+fb %>%
+  model(MEAN()) %>%
+  forecast(h=100) %>%
+  autoplot(fb)
   
 ```
 
-*__1.b Which country has the highest GDP per capita? How has this changed over time?__*
-  
-We filter GDP per capita at 80,000 and find that Monaco has the highest GDP per capita, and has since the 1990s, with some brief exceptions when Liechtenstein led GDP per capita.
+__*3. Apply a seasonal naïve method to the quarterly Australian beer production data from 1992. Check if the residuals look like white noise, and plot the forecasts.*__
   
 ```{r}
-
-global_economy_PerCapita2 <- global_economy_PerCapita %>%
-  filter(GDPperCapita>=80000)
-
-global_economy_PerCapita2 %>% autoplot()
+# Extract data of interest
+recent_production <- aus_production %>%
+  filter(year(Quarter) >= 1992)
+# Define and estimate a model
+fit <- recent_production %>% model(SNAIVE(Beer))
+# Look at the residuals
+fit %>% gg_tsresiduals()
+# Look a some forecasts
+fit %>% forecast() %>% autoplot(recent_production)
 
 ```
   
-__*2. For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect. United States GDP from global_economy:*__
-
-The GDP per capita in the US appears to be increasing exponentially, so a log transformation seems appropriate.  In fact, the log transformation is only mildly effective, though not entirely, effective.
-
+__*3.4 Repeat the previous exercise using the Australian Exports series from global_economy and the Bricks series from aus_production. Use whichever of NAIVE() or SNAIVE() is more appropriate in each case.*__
 
 ```{r base plot, warning = FALSE, echo=FALSE, out.width="50%"}
 
-ge_US <- global_economy %>%
-  mutate(GDPperCapita = round(GDP/Population,0)) %>%
-  filter(Country=="United States") %>%
-  mutate(logGDPperCapita = log(GDPperCapita))
+ausexp <- global_economy %>%
+  filter(Country == "Australia") %>%
+  select(Exports)
 
-ge_US %>% autoplot(GDPperCapita) + labs(title = "US GDP per Capita - no transformation")
-ge_US %>% autoplot(logGDPperCapita) +labs(title = "US GDP per capita - log transformation")
+fit <- ausexp %>% model(NAIVE())
+fit %>% gg_tsresiduals()
+fit %>% forecast() %>% autoplot(ausexp)
 
-
-```
-
-__*2b. slaughter of Victorian “Bulls, bullocks and steers” in aus_livestock.*__
-
-Here we can perform a box-cox transformation to create more linearity and stabilize variation. In fact, the box cox has little effect.  We can also perform a moving average (11 months works well here) to isolate the trend from the seasonality.
-
-
-```{r, warning = FALSE, echo=FALSE, out.width="50%"}
-aus_livestock2 <- aus_livestock %>%
-  filter(State == "Victoria", Animal=="Bulls, bullocks and steers")
-
-autoplot(aus_livestock2) + labs(title = "Victorian Livestock Slaughter - no transformation")
-
-lambda <- aus_livestock2 %>%
-  features(Count, features = guerrero) %>%
-  pull(lambda_guerrero)
-aus_livestock2 %>%
-  autoplot(box_cox(Count, lambda)) + labs(title = "Victorian Livestock Slaughter - boxcox (-.044)")
-
-lambda
-
-aus_livestock3 <- aus_livestock2 %>%
-  mutate(MovingAve = slider::slide_dbl(Count, mean, .before = 5, .after = 5, .complete =TRUE)) %>%
-  drop_na()
- 
-aus_livestock3 %>% autoplot(Count) +
- geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
-  labs(y = "Count",
-       title = "Victorian Livestock Slaughter - moving average (11 months)") +
-  guides(colour = guide_legend(title = "series"))
+fit <- bricks %>% model(SNAIVE())
+fit %>% gg_tsresiduals()
+fit %>% forecast() %>% autoplot(bricks)
 
 ```
 
-*__2.c Victorian Electricity Demand from vic_elec__*
-
-For this dataset it is possible to do a moving average, but the variation renders it not very useful.  
+__*3.7 For your retail time series (from Exercise 8 in Section 2.10), create a training dataset consisting of observations before 2011*__ 
 
 ```{r}
-dfe <- as_tibble(vic_elec)
-
-vic_elec2 <- vic_elec %>%
-  select(Demand)
-  
- vic_elec3 <- vic_elec2 %>%
-  mutate(MovingAve = slider::slide_dbl(Demand, mean, .before = 100, .after = 100, .complete =TRUE)) %>%
-  drop_na()
-
- vic_elec3 %>% autoplot(Demand) +
- geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
-  labs(y = "Count",
-       title = "Electricity Demand from Victoria with Moving Average (200 30m periods)") +
-  guides(colour = guide_legend(title = "series"))
-
-```
-
-*__2.d Gas production from aus_production.__*
-
-A boxcox with a .11 lambda helps make the curve more linear and significantly reduce variability.
-
-```{r, out.width="50%"}
-autoplot(aus_production) + labs(title = "Austrailian Gas Production - no transformation")
-
-
-lambda <- aus_production %>%
-  features(Gas, features = guerrero) %>%
-  pull(lambda_guerrero)
-aus_production %>%
-  autoplot(box_cox(Gas, lambda))+ labs(title = "Austrailian Gas Production - Box-Cox (.11)")
-
-
-lambda
-
-```
-
-__*3. Why is a Box-Cox transformation unhelpful for the canadian_gas data?*__
-
-A box cox transformation will make an uneven trend appear more linear.  The trend already appears linear. In addition, the increase i variation is restricted to a particular region - it is does not rise continuously.
-
-
-```{r, out.width="50%"}
-head(canadian_gas)
-
-lambda <- canadian_gas %>%
-  features(Volume, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-autoplot(canadian_gas)+ labs(title = "Canadian Gas Production - No Transformation")
-
-
-canadian_gas %>%
-  autoplot(box_cox(Volume, lambda)) + labs(title = "Austrailian Gas Production - Box-Cox")
-
-
-lambda
-```
-__*4.  What Box-Cox transformation would you select for your retail data (from Exercise 8 in Section 2.10)?*__
-
-Using guerrerro, the best lambda is .22.  The difference is moderate, maving the effect of smoothing out the large jump toward the end of the year.
-
-```{r out.width="50%"}
 
 set.seed(042760)
-myRetailseries <- aus_retail %>%
-  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
-         
-autoplot(myRetailseries) + labs(title = "No Transformation")
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+  fill_gaps() %>%
+  select(Turnover)
 
-lambda <- myRetailseries %>%
-  features(Turnover, features = guerrero) %>%
-  pull(lambda_guerrero)
+myseries_train <- myseries %>%
+  filter(year(Month) < 2011)
 
-myRetailseries %>%
-  autoplot(box_cox(Turnover, lambda)) + labs(title = "Box-Cox")
+autoplot(myseries, Turnover) +
+  autolayer(myseries_train, Turnover, colour = "red")
 
-lambda
+fit <- myseries_train %>%
+  model(SNAIVE())
 
-```
-*__5. For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance. Tobacco from aus_production, Economy class passengers between Melbourne and Sydney from ansett, and Pedestrian counts at Southern Cross Station from pedestrian.__*
+fit %>% gg_tsresiduals()
 
-```{r, out.width="50%"}
+fc <- fit %>%
+  forecast(new_data = anti_join(myseries, myseries_train))
+fc %>% autoplot(myseries)
 
-lambda <- aus_production %>%
-  features(Tobacco, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-aus_production %>%
-  autoplot() +  labs(title = "Tobacco, No Transformation") 
-
-aus_production %>%
-  autoplot(box_cox(Tobacco, lambda)) +  labs(title = "Tobacco, Boxcox (.93)")
-
-lambda
+fit %>% accuracy()
+fc %>% accuracy(myseries)
 
 ```
 
-
-```{r, out.width="50%"}
-
-ansett1 <- ansett %>%
-  filter(Class=="Economy", Airports=="MEL-SYD")
-  
-lambda <- ansett1 %>%
-  features(Passengers, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-ansett1 %>% autoplot(Passengers) +  labs(title = "Passengers - MEL to SYD, No Transformation") 
-
-ansett1 %>%
-  autoplot(box_cox(Passengers, lambda)) +  labs(title = "Passengers - MEL to SYD, Boxcox(2.0)") 
-
-lambda
-
-```
-
-```{r, out.width="50%"}
-
-Pedestrian1 <- pedestrian %>%
-  filter(Sensor=="Southern Cross Station")
-  
-lambda <- Pedestrian1 %>%
-  features(Count, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-Pedestrian1 %>% autoplot(Count) +  labs(title = "Passenger Count - Southern Cross, No Transformation") 
-
-Pedestrian1 %>%
-  autoplot(box_cox(Count, lambda)) +  labs(title = "Passenger Count - Southern Cross, Boxcox(-.25)") 
-
-lambda
-
-```
-
-__*7. Consider the last five years of the Gas data from aus_production.  Plot the time series. Can you identify seasonal fluctuations and/or a trend-cycle?*__
-
-The trend is upward - seasonality is very strong, peaking in the summer months.
-```{r}
-
-gas <- tail(aus_production, 5*4) %>% select(Gas)
-autoplot(gas)
-```
-
-__*7.b Use classical_decomposition with type=multiplicative to calculate the trend-cycle and seasonal indices.*__
-
-```{r}
-
-gas %>%
-  model(
-    classical_decomposition(Gas, type = "multiplicative")
-  ) %>%
-  components() %>%
-  autoplot() +
-  labs(title = "Classical multiplicative decomposition of Australian Gas Production")
-
-
-```
-
-__*7.c Do the results support the graphical interpretation from part a?*__
-
-Yes, the results are supported.
-
-__*7.d Compute and plot the seasonally adjusted data.*__
-
-```{r}
-
- gas2 <- gas %>%
-  mutate(MovingAve = slider::slide_dbl(Gas, mean, .before =2, .after = 2, .complete =TRUE)) %>%
-  drop_na()
-
-gas2 %>% autoplot(Gas) +
- geom_line(aes(y = MovingAve), colour = "#D55E00", size=1.5) +
-  labs(y = "Count",
-       title = "Gas Demand") +
-  guides(colour = guide_legend(title = "series"))
-
-
-```
-
-*__7.e Change one observation to be an outlier (e.g., add 300 to one observation), and recompute the seasonally adjusted data. What is the effect of the outlier?  Does it make any difference if the outlier is near the end rather than in the middle of the time series?__*
-
-Outliers have a significant effect on seasonal adjustment.  However the effect is temporary, as it tends to wash out before and after the adjustment window.  Early and late outliers have more effect snce they are not baanced in the same way.
 
 
 ```{r}
 
-gas_out <- gas2 %>%
-  mutate(Gas2=ifelse(as.character(Quarter)=="2007 Q4", 300, Gas)) %>%
-  mutate(Gas3=ifelse(as.character(Quarter)=="2006 Q1", 700, Gas))
-  
- gasout2 <- gas_out %>%
-  mutate(MovingAve2 = slider::slide_dbl(Gas2, mean, .before =2, .after = 2, .complete =TRUE)) %>%
-   mutate(MovingAve3 = slider::slide_dbl(Gas3, mean, .before =2, .after = 2, .complete =TRUE)) %>%
-  drop_na()
+set.seed(042760)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+  fill_gaps() %>%
+  select(Turnover)
 
-gasout2 %>% autoplot(Gas) +
- geom_line(aes(y = MovingAve2), colour = "#00FF00", size=1.5) +
-  geom_line(aes(y = MovingAve3), colour = "#FF0000", size=1.5) +
- geom_line(aes(y = MovingAve), colour = "#0000FF", size=1.5) +
-  labs(y = "Count",
-       title = "Gas Demand - red = early outlier, green = mid series outlier") +
-  guides(colour = guide_legend(title = "series"))
+myseries_train <- myseries %>%
+  filter(year(Month) < 2016)
 
-```
+autoplot(myseries, Turnover) +
+  autolayer(myseries_train, Turnover, colour = "red")
 
+fit <- myseries_train %>%
+  model(SNAIVE())
 
-*__8. Recall your retail time series data (from Exercise 8 in Section 2.10). Decompose the series using X-11. Does it reveal any outliers, or unusual features that you had not noticed previously?__*
+fit %>% gg_tsresiduals()
 
-```{r}
-x11_dcmp <- myRetailseries %>%
-  model(x11 = X_13ARIMA_SEATS(Turnover ~ x11())) %>%
-  components()
-autoplot(x11_dcmp) +
-  labs(title =
-    "Decomposition of turnover in Australian retail employment using X-11.")
+fc <- fit %>%
+  forecast(new_data = anti_join(myseries, myseries_train))
+fc %>% autoplot(myseries)
 
+fit %>% accuracy()
+fc %>% accuracy(myseries)
 
 ```
-
-The decomposition reveals a number of things - seasonality is highest in the middle years of the series, not the end as I had thought, and there are some significant outliers in the 1990s.
-
-__*9. Figures 3.19 and 3.20 show the result of decomposing the number of persons in the civilian labour force in Australia each month from February 1978 to August 1995. Write about 3–5 sentences describing the results of the decomposition. Pay particular attention to the scales of the graphs in making your interpretation.  Is the recession of 1991/1992 visible in the estimated components?*__
-
-The most significant element of the decomposition is the trend which increases linearly over time. There does not appear to be any cyclicality.  This is followed by seasonality - there is a marked annual seasonality, in which March, September and December appear to be peak months, while Jan and August are low months.  It is possible that laborers enter the market at harvest time (March), planting time (September), and for the holidays (December). Noise is a small component of the decomposition. The recession is found mainly in the noise element - it is barely perceptible as a slight flattening in the trend.
-
-
