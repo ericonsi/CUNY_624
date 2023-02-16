@@ -1,7 +1,7 @@
 ---
-title: "Eric_Hirsch_624_Homework_2"
+title: "Eric_Hirsch_624_Homework_3"
 output: html_document
-date: "2023-02-10"
+date: "2023-02-16"
 ---
 
 ```{r setup, include=FALSE}
@@ -25,50 +25,61 @@ __*1.Produce forecasts for the following series using whichever of NAIVE(y), SNA
 
 __*1.a Australian Population (global_economy)*__
 
+This time series lends itself best to drift. There is no apparent seasonality, and the trend is strong and straightforward.  The forecast looks quite reasonable.
+
 ```{r}
 ge_AUS <- global_economy %>%
   filter(Country=="Australia") %>%
   select(Population)
 
-ge_AUS %>% autoplot()
+#ge_AUS %>% autoplot()
 
 fit <- ge_AUS %>% model(RW(Population~drift()))
-fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(ge_AUS)
+fit %>% forecast(h=10) %>% autoplot(ge_AUS) + labs(title = "Australian Population")
 
 
 ```
 
 __*1.b. Bricks (aus_production)*__
 
+Brick production is highly seasonal, and the trendline isn't clear.  We use SNAIVE for this time series.
+
+
 ```{r}
 bricks <- aus_production %>%
   select(Bricks) %>%
+  #filter here to allow consistent seasonality
   filter_index("1956 Q1" ~ "2005 Q2")
 
-bricks %>% autoplot()
+#bricks %>% autoplot()
 
 fit <- bricks %>% model(SNAIVE())
-fit %>% forecast() %>% autoplot(bricks)
+fit %>% forecast() %>% autoplot(bricks) + labs(title = "Brick Production")
 
 
 ```
+
+
 __*1.c NSW Lambs (aus_livestock)*__
+
+Lamb slaughter also has a strong seasonal component, so we use SNAIVE.
+
 ```{r}
 x <- aus_livestock
 lambs <- aus_livestock %>%
   filter(Animal == "Lambs", State=="New South Wales") 
 
-lambs %>% autoplot()
+#lambs %>% autoplot()
 
 fit <- lambs %>% model(SNAIVE())
-fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(lambs)
+fit %>% forecast() %>% autoplot(lambs) + labs(title = "Lamb Slaughter in New South Wales")
 
 
 ```
 
-__* 1.d Household wealth (hh_budget).*__
+__*1.d Household wealth (hh_budget).*__
+
+Household wealth does not exhibit seasonality and has a discernible, though uneven, trend.  We use drift.
 
 ```{r}
 
@@ -76,27 +87,33 @@ x <- hh_budget
 wealth <- hh_budget %>%
   select(Wealth) 
 
-wealth %>% autoplot()
+#wealth %>% autoplot()
 
 fit <- wealth %>% model(RW(Wealth~drift()))
 #fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(wealth)
+fit %>% forecast() %>% autoplot(wealth) + labs(title = "Household Wealth")
 
 ```
 
-__*Australian takeaway food turnover (aus_retail).*__
+__*1.e Australian takeaway food turnover (aus_retail).*__
+
+We need to create a new tsibble which combines the data from all Australian states for each month. The result has both trend and seasonality - we choose SNAIVE to emphasize the seasonality.
 
 ```{r}
 
 food <- aus_retail %>%
   filter(Industry=="Takeaway food services") %>%
-  select(Turnover)
+  select(Turnover) 
 
-food %>% autoplot()
+food1 <- food %>%
+  index_by(Month) %>%
+  summarize(SumOfTurnover=sum(Turnover)) %>%
+  as_tsibble()
 
-fit <- food %>% model(SNAIVE(Turnover))
-#fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(food)
+#food %>% autoplot()
+
+fit <- food1 %>% model(SNAIVE(SumOfTurnover))
+fit %>% forecast() %>% autoplot(food1) + labs(title = "Takeaway Food Service, All Australia") 
 
 ```
 
@@ -113,12 +130,13 @@ fb <- gafa_stock %>%
   update_tsibble(index = day, regular = TRUE) %>%
   select(Close)
 
-fb %>% autoplot(Close)
+fb %>% autoplot(Close) + labs(title = "Facebook Daily Close Price") 
 
 ```
 
 __*2.b_c Produce forecasts using the drift method and plot them. Show that the forecasts are identical to extending the line drawn between the first and last observations.*__
 
+We can see that the drift method is contiguous with a line from first to last observation.
 ```{r}
 head(fb$Close,1)
 tail(fb$Close,1)
@@ -127,28 +145,32 @@ fb %>%
   model(RW(Close ~ drift())) %>%
   forecast(h=100) %>%
   autoplot(fb) +
-  labs(title = "Daily Close Price for Facebook") +
+  labs(title = "Facebook Daily Close Price") +
   geom_segment(aes(x=0, xend=1250, y=54.71, yend = 131.09),
                colour = "red")
 
 ```
 
-__* 2.d Try using some of the other benchmark functions to forecast the same data set. Which do you think is best? Why?*__
+__*2.d Try using some of the other benchmark functions to forecast the same data set. Which do you think is best? Why?*__
 
-```{r}
+We use Naive and Mean.  None of the three seem reasonable given the significant shift in trend in which the stock appears to be going down.
+
+```{r out.width="50%"}
 fb %>%
   model(NAIVE()) %>%
   forecast(h=100) %>%
-  autoplot(fb)
+  autoplot(fb) + labs(title = "Facebook Daily Close Price") 
 
 fb %>%
   model(MEAN()) %>%
   forecast(h=100) %>%
-  autoplot(fb)
+  autoplot(fb)+ labs(title = "Facebook Daily Close Price") 
   
 ```
 
 __*3. Apply a seasonal naïve method to the quarterly Australian beer production data from 1992. Check if the residuals look like white noise, and plot the forecasts.*__
+
+There is no discernible pattern in the residuals or ACF, although the residuals show an odd pattern in the two peaks around 0.  We speculate that the reason is the pronounced seasonality - forecasts are likely in that case to significantly overestimate or underestimate the actual value .  
   
 ```{r}
 # Extract data of interest
@@ -159,11 +181,16 @@ fit <- recent_production %>% model(SNAIVE(Beer))
 # Look at the residuals
 fit %>% gg_tsresiduals()
 # Look a some forecasts
-fit %>% forecast() %>% autoplot(recent_production)
+fit %>% forecast() %>% autoplot(recent_production) + labs(title = "Australian Beer Production since 1992") 
 
 ```
   
 __*3.4 Repeat the previous exercise using the Australian Exports series from global_economy and the Bricks series from aus_production. Use whichever of NAIVE() or SNAIVE() is more appropriate in each case.*__
+
+Export residuals show little patterning and are distributed normally around 0.  The ACF shows no discernible pattern.
+
+However, Brick production shows bias, patterning in the residuals and strong seasonal patterns in the acf.  This may be because SNAIVE is picking up the seasonality but not the trend.
+
 
 ```{r base plot, warning = FALSE, echo=FALSE, out.width="50%"}
 
@@ -173,15 +200,19 @@ ausexp <- global_economy %>%
 
 fit <- ausexp %>% model(NAIVE())
 fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(ausexp)
+fit %>% forecast() %>% autoplot(ausexp)+ labs(title = "Australian Exports") 
+
 
 fit <- bricks %>% model(SNAIVE())
 fit %>% gg_tsresiduals()
-fit %>% forecast() %>% autoplot(bricks)
+fit %>% forecast() %>% autoplot(bricks) + labs(title = "Brick Production") 
+
 
 ```
 
-__*3.7 For your retail time series (from Exercise 8 in Section 2.10), create a training dataset consisting of observations before 2011*__ 
+__*3.7 For your retail time series (from Exercise 8 in Section 2.10), create a training dataset consisting of observations before 2011. Check that your data have been split appropriately.  Fit a seasonal naïve model using SNAIVE() applied to your training data.  Check the residuals.  Do the residuals appear to be uncorrelated and normally distributed?  Produce forecasts for the test data.  Compare the accuracy of your forecasts against the actual values.  How sensitive are the accuracy measures to the amount of training data used?*__ 
+
+The forecasting has some obvious problems - 1) The training portion and test portion have very different characteristics, 2) as a result the forecast shows significant bias, 3) as well as significant autocorrelation.  The test accuracy, using the RSME, is more than twice that of the training set.
 
 ```{r}
 
@@ -195,7 +226,7 @@ myseries_train <- myseries %>%
   filter(year(Month) < 2011)
 
 autoplot(myseries, Turnover) +
-  autolayer(myseries_train, Turnover, colour = "red")
+  autolayer(myseries_train, Turnover, colour = "red") + labs(title = "My Retail Series, Training Data is <2011") 
 
 fit <- myseries_train %>%
   model(SNAIVE())
@@ -204,14 +235,14 @@ fit %>% gg_tsresiduals()
 
 fc <- fit %>%
   forecast(new_data = anti_join(myseries, myseries_train))
-fc %>% autoplot(myseries)
+fc %>% autoplot(myseries) + labs(title = "My Retail Series, Training Data is <2016") 
 
 fit %>% accuracy()
 fc %>% accuracy(myseries)
 
 ```
 
-
+If we include more of the training set, the result improves.  Indeed, the test set now has *__A LOWER RMSE__* than the training set.  The question as to whether a larger training set improves the result depends on the situation.  However, SNAIVE is unlikely to overfit - in this case not including data prior to 2011 seriously underfit the training set.
 
 ```{r}
 
@@ -225,7 +256,7 @@ myseries_train <- myseries %>%
   filter(year(Month) < 2016)
 
 autoplot(myseries, Turnover) +
-  autolayer(myseries_train, Turnover, colour = "red")
+  autolayer(myseries_train, Turnover, colour = "red") + labs(title = "My Retail Series, Training Data is <2016") 
 
 fit <- myseries_train %>%
   model(SNAIVE())
@@ -234,7 +265,8 @@ fit %>% gg_tsresiduals()
 
 fc <- fit %>%
   forecast(new_data = anti_join(myseries, myseries_train))
-fc %>% autoplot(myseries)
+fc %>% autoplot(myseries) + labs(title = "My Retail Series, Training Data is <2016") 
+
 
 fit %>% accuracy()
 fc %>% accuracy(myseries)
