@@ -1,0 +1,54 @@
+---
+title: "Eric_Hirsch_624_Homework_2"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(forecast)
+library(fpp3)
+library(fable)
+library(EHData)
+library(gridExtra)
+
+```
+
+Exercises 1,2,3,4,7
+
+__*1.Produce forecasts for the following series using whichever of NAIVE(y), SNAIVE(y) or RW(y ~ drift()) is more appropriate in each case:*__
+
+__*1.a Australian Population (global_economy)*__
+
+```{r}
+library(mlbench)
+data(Glass)
+
+dfGlass <- Glass %>% 
+  mutate(Type = as.numeric(Type))
+
+str(dfGlass)
+
+```
+
+```{r}
+
+
+w <- EHSummarize_SingleColumn_Boxplots(dfGlass)
+x <- EHSummarize_SingleColumn_Histograms(dfGlass)
+
+grid.arrange(grobs=w[1:10], ncols=3)
+grid.arrange(grobs=x[1:10], ncols=3)
+
+a <- EHExplore_Multicollinearity(dfGlass, threshold=.6, printHighest = TRUE)
+
+```
+
+
