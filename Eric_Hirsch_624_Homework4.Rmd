@@ -20,23 +20,34 @@ library(EHData)
 library(gridExtra)
 
 ```
+__*3.1. The UC Irvine Machine Learning Repository contains a data set related  to glass identification.*__
 
-Exercises 1,2,3,4,7
+__*3.1a (a) Using visualizations, explore the predictor variables to understand their distributions as well as the relationships between predictors.*__
 
-__*1.Produce forecasts for the following series using whichever of NAIVE(y), SNAIVE(y) or RW(y ~ drift()) is more appropriate in each case:*__
-
-__*1.a Australian Population (global_economy)*__
+There are 9 variables altogether, including 8 numeric and one factor (the predictor, "type", a six level variable).  
 
 ```{r}
 library(mlbench)
 data(Glass)
 
-dfGlass <- Glass %>% 
+summary(Glass)
+str(Glass)
+
+dfGlass <- Glass %>%
   mutate(Type = as.numeric(Type))
 
-summary(dfGlass)
-
 ```
+The heatmap shows some multicollinearity.  However, the RI/CA and MG/Type pairs are the only ones with a correlation above .6 or below -.6.
+
+```{r}
+
+a <- EHExplore_Multicollinearity(dfGlass, threshold=.6, printHighest = TRUE)
+```
+
+
+__*3.1b Do there appear to be any outliers in the data? Are any predictors skewed?*__
+
+Boxplots show possible outliers for K, Fe, Na and possibly others.  Without knowing more about the data we cannot know whether they are anomalies or data errors.  Distributions vary - some are relatively normal while others (K, Ba, Fe, Mg)  are highly skewed or are bimodal.
 
 ```{r}
 
@@ -46,31 +57,33 @@ x <- EHSummarize_SingleColumn_Histograms(dfGlass)
 grid.arrange(grobs=w[1:10], ncols=3)
 grid.arrange(grobs=x[1:10], ncols=3)
 
-a <- EHExplore_Multicollinearity(dfGlass, threshold=.6, printHighest = TRUE)
-
 ```
+
+__*3.1c (c) Are there any relevant transformations of one or more predictors that  might improve the classification model?*__
+
+We can run a multinomial regression to get a baseline.  The AIC is 399.
 
 ```{r}
 library(caret)
 
  library("nnet")
 test <- multinom(Type ~ ., data = dfGlass)
-#a <- EHModel_Regression_StandardLM(dfGlass, "Type")
 test
 
 ```
+We can try to normalize the skewed distributions using boxcox - while the distributions don't look very different, AIC falls to .387. 
 
 ```{r}
-devtools::install_github("ericonsi/EHData")
-library(EHData)
+#devtools::install_github("ericonsi/EHData")
+#library(EHData)
 
-df3 <- dfGlass %>%
+Z3 <- dfGlass %>%
   mutate(Ba=Ba+1, K=K+1, Fe=Fe+1, Mg=Mg+1)
 
-Z <- EHPrepare_BoxCox(df3, "Al", print=TRUE)
-Z1 <- EHPrepare_BoxCox(Z, "Ba", print=TRUE)
-Z2 <- EHPrepare_BoxCox(Z1, "Fe", print=TRUE)
-Z3 <- EHPrepare_BoxCox(Z2, "Mg", print=TRUE)
+#Z <- EHPrepare_BoxCox(df3, "Al", print=TRUE)
+#Z1 <- EHPrepare_BoxCox(Z, "Ba", print=TRUE)
+#Z2 <- EHPrepare_BoxCox(Z1, "Fe", print=TRUE)
+#Z3 <- EHPrepare_BoxCox(Z2, "Mg", print=TRUE)
 
 x <- Z3 %>%
   dplyr::select(Mg, K, Fe, Ba)
@@ -82,17 +95,25 @@ test
 
 
 ```
+Removing possible outliers reduces our AIC to .384. (We should take care in removing this data, which might tell us something interesting when data meets certain rare conditions.)
+
 ```{r}
 dfGlass2 <- dfGlass %>%
   filter(K<4, Fe<.5, Na <15) %>%
   mutate(Mg=log(Mg+1), K=log(K+1), Fe=log(Fe+1),Ba=log(Ba+1)) 
 
 test <- multinom(Type ~ ., data = dfGlass2)
-#a <- EHModel_Regression_StandardLM(dfGlass, "Type")
 test
 
 
 ```
+
+__*3.2 The soybean data can also be found at the UC Irvine Machine Learning  Repository. Data were collected to predict disease in 683 soybeans.*__
+
+__*3.2a Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed earlier in this chapter?*__
+
+There are many predictors that are severely unbalanced.  For example, in the case of mycelium, 0's outweigh 1's by a factor of more than 100.  Sclerotia is similarly unbalanced. There are also possible degeneration issues for mold.growth, seed.discolor, seed.size and shriveling.
+
 ```{r}
 library(mlbench)
 data(Soybean)
@@ -100,19 +121,17 @@ data(Soybean)
 dfSoybean <- Soybean 
 
 summary(dfSoybean)
-str(dfSoybean)
+
 
 ```
+__*3.2b Roughly 18% of the data are missing. Are there particular predictors that  are more likely to be missing? Is the pattern of missing data related to  the classes?*__
+
+There are 2337 missing values in the dataset.  
 
 ```{r}
-
-dfSoybeanNum <- dfSoybean %>%
-  dplyr::select(-Class, -date)  %>%
-  mutate_all(as.numeric) %>%
-  drop_na()
-
-x <- EHExplore_Multicollinearity(dfSoybeanNum, threshold = .7, printHighest = TRUE)
+sum(is.na(dfSoybean))
 ```
+
 
 ```{r}
 
