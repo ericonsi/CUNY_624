@@ -21,6 +21,8 @@ library(gridExtra)
 
 ```
 
+8.1, 8.5, 8.6, 8.7, 8.8, 8.9
+
 
 __*3.1. The UC Irvine Machine Learning Repository contains a data set related  to glass identification.*__
 
@@ -73,7 +75,7 @@ test <- multinom(Type ~ ., data = dfGlass)
 test
 
 ```
-We can try to normalize the skewed distributions using boxcox. Using trial and error, we find that 3 transformations (Al, Ba and Ca) reduce our AIC to 377.  It is worth noting that when all four of the mostly skewed variables are transformed, the AIC increases to 401.  Thus, boxcox transformations are no guarantee of improved fit. Shown below are the histograms for Al before and after boxcox.
+We can try to normalize the skewed distributions using boxcox. Using trial and error, we find that 3 transformations (al, Ba and Ca) reduce our AIC to 377.  It is worth noting that when all four of the mostly skewed variables are transformed, the AIC increases to 401.  Thus, boxcox transformations are no guarantee of improved fit. 
 
 ```{r}
 #devtools::install_github("ericonsi/EHData")
@@ -93,8 +95,8 @@ Z4 <- Z3 %>%
   #mutate(Ba=BoxCox(Ba, a), K=BoxCox(K, b), Fe=BoxCox(Fe, c), Mg=BoxCox(Mg, d))
     mutate(Al=BoxCox(Al, e), Ba=BoxCox(Ba, a), Ca =BoxCox(Ca, f))
 
-hist(dfGlass$Al, main="Al - before boxcox")
-hist(Z4$Al, main = "Al - after boxcox, lambda = .5")
+hist(dfGlass$Al)
+hist(Z4$Al)
 
 test <- multinom(Type ~ ., data = Z4)
 test
