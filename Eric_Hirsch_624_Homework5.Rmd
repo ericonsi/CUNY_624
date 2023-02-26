@@ -1,5 +1,5 @@
 ---
-title: "Eric_Hirsch_624_Homework_4"
+title: "Eric_Hirsch_624_Homework_5"
 output: html_document
 date: "2023-02-24"
 ---
@@ -23,147 +23,260 @@ library(gridExtra)
 
 8.1, 8.5, 8.6, 8.7, 8.8, 8.9
 
+__*8.1 Consider the the number of pigs slaughtered in Victoria, available in the aus_livestock dataset.*__
 
-__*3.1. The UC Irvine Machine Learning Repository contains a data set related  to glass identification.*__
-
-__*3.1a Using visualizations, explore the predictor variables to understand their distributions as well as the relationships between predictors.*__
-
-There are 9 variables altogether, including 8 numeric and one factor (the target, a six level variable).  
-
-```{r}
-library(mlbench)
-data(Glass)
-
-summary(Glass)
-str(Glass)
-
-dfGlass <- Glass %>%
-  mutate(Type = as.numeric(Type))
-
-```
-The heatmap shows some multicollinearity.  However, the RI/CA and MG/Type pairs are the only ones with a correlation above .6 or below -.6.
-
-```{r}
-
-a <- EHExplore_Multicollinearity(dfGlass, threshold=.6, printHighest = TRUE)
-```
-
-
-__*3.1b Do there appear to be any outliers in the data? Are any predictors skewed?*__
-
-Boxplots show possible outliers for K, Fe, Na and possibly others.  Without knowing more about the data we cannot know whether they are anomalies or data errors.  Distributions vary - many are only somewhat skewed while others (K, Ba, Fe, Mg)  are highly skewed or are bimodal.
-
-```{r}
-
-w <- EHSummarize_SingleColumn_Boxplots(dfGlass)
-x <- EHSummarize_SingleColumn_Histograms(dfGlass)
-
-grid.arrange(grobs=w[1:10], ncols=3)
-grid.arrange(grobs=x[1:10], ncols=3)
-
-```
-
-__*3.1c (c) Are there any relevant transformations of one or more predictors that  might improve the classification model?*__
-
-We can run a multinomial regression to get a baseline.  The AIC is 399.
-
-```{r}
-library(caret)
-
- library("nnet")
-test <- multinom(Type ~ ., data = dfGlass)
-test
-
-```
-We can try to normalize the skewed distributions using boxcox. Using trial and error, we find that 3 transformations (al, Ba and Ca) reduce our AIC to 377.  It is worth noting that when all four of the mostly skewed variables are transformed, the AIC increases to 401.  Thus, boxcox transformations are no guarantee of improved fit. 
-
-```{r}
-#devtools::install_github("ericonsi/EHData")
-#library(EHData)
-
-Z3 <- dfGlass %>%
-  mutate(Ba=Ba+1, K=K+1, Fe=Fe+1, Mg=Mg+1)
-
-a <- BoxCoxTrans(Z3$Ba)$lambda
-b <- BoxCoxTrans(Z3$K)$lambda
-c <- BoxCoxTrans(Z3$Fe)$lambda
-d <- BoxCoxTrans(Z3$Mg)$lambda
-e <- BoxCoxTrans(Z3$Al)$lambda
-f <- BoxCoxTrans(Z3$Ca)$lambda
-
-Z4 <- Z3 %>%
-  #mutate(Ba=BoxCox(Ba, a), K=BoxCox(K, b), Fe=BoxCox(Fe, c), Mg=BoxCox(Mg, d))
-    mutate(Al=BoxCox(Al, e), Ba=BoxCox(Ba, a), Ca =BoxCox(Ca, f))
-
-hist(dfGlass$Al)
-hist(Z4$Al)
-
-test <- multinom(Type ~ ., data = Z4)
-test
-
-
-```
-Removing possible outliers reduces our AIC to 374. (We should take care in removing this data, which might tell us something interesting when data meets certain rare conditions.)
-
-```{r}
-dfGlass2 <- dfGlass %>%
-  filter(K<4, Fe<.5, Na <15) %>%
-  mutate(Ba=Ba+1, K=K+1, Fe=Fe+1, Mg=Mg+1) %>%
-  mutate(Al=BoxCox(Al, e), Ba=BoxCox(Ba, a), Ca =BoxCox(Ca, f))
-
-test <- multinom(Type ~ ., data = dfGlass2)
-test
-
-
-```
-
-__*3.2 The soybean data can also be found at the UC Irvine Machine Learning  Repository. Data were collected to predict disease in 683 soybeans.*__
-
-__*3.2a Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed earlier in this chapter?*__
-
-There are many predictors that are severely unbalanced.  For example, in the case of mycelium, 0's outweigh 1's by a factor of more than 100.  Other variables have balance issues as well, though not as sever - Sclerotia is unbalanced and there are possible degeneration issues for mold.growth, seed.discolor, seed.size and shriveling as well.
-
-```{r}
-library(mlbench)
-data(Soybean)
-
-dfSoybean <- Soybean 
-
-summary(dfSoybean)
-
-
-```
-__*3.2b Roughly 18% of the data are missing. Are there particular predictors that  are more likely to be missing? Is the pattern of missing data related to  the classes?*__
-
-There are 2337 missing values in the dataset. The data are missing in groups.  For example, columns related to the leaf (e.g., leaf.halo and leaf.marg) are all missing or not as a group. Many records are missing most of the groups.
-
-```{r}
-sum(is.na(dfSoybean))
-```
+__*8.1a Use the ETS() function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of α and ℓ, and generate forecasts for the next four months.*__
 
 
 ```{r}
 
-EHSummarize_MissingValues(dfSoybean)
+dfPigs <- aus_livestock %>%
+  filter(grepl("Pigs", Animal), State=="Victoria")
+
+fit <- dfPigs %>%
+  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+fc <- fit %>%
+  forecast(h = 4)
+
+rp <- report(fit)
+
+fc %>%
+  autoplot(dfPigs) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="Count", title="Pigs Slaughtered") +
+  guides(colour = "none")
+
 ```
 
-The records with missing values are highly correlated with the various classes as the following mutlinomial regression shows.  
+__*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
 
 ```{r}
-dfSoybean1 <-dfSoybean %>%
-  mutate(missing = ifelse(if_any(.fns = is.na),1,0), random=ifelse(nrow(dfSoybean)>300,1,0)) 
 
-test <- multinom(Class ~ missing, data = dfSoybean1)
-test
+fc
 
-z <- summary(test)$coefficients/summary(test)$standard.errors
-p <- (1 - pnorm(abs(z), 0, 1)) * 2
-p
+Interval <- fc %>% hilo(95)
+Interval
+
 ```
 
-__*3.2c Develop a strategy for handling missing data, either by eliminating  predictors or imputation.*__
 
-We cannot eliminate records with any missing vaues because there are too many, and because they are not missing at random (MNAR). Some of the columns are missing 18% of their values, but eliminating them risks losing valuable information.  In some cases, degenerate columns overlap with missing value columns (e.g., mold.growth) - these might be removed because there is more than one reason to do so.
+__*8.5 Data set global_economy contains the annual Exports from many countries. Select one country to analyse.*__
 
-Otherwise we are looking at imputation. Prior to imputation, dummy variables should be created to flag the missing group(s) to which the record belongs.  Then we should test individual columns to see if they are MNAR - if not, we can use KNN or Linear regression to estimate missing values.  When the data is MNAR there is no reason to think the variables are necessarily predictable from the nonmissing values - in this case it might be best to us median or mean.
+__*8.5a Plot the Exports series and discuss the main features of the data.*__
 
+```{r}
+
+dfUSA <- global_economy %>%
+  filter(grepl("United States", Country), Year<2017) 
+
+autoplot(dfUSA, Exports)
+
+```
+
+
+__*8.5b Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.*__
+
+```{r}
+
+fit <- dfUSA %>%
+  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+
+fc <- fit %>%
+  forecast(h = 10)
+
+rp <- report(fit)
+
+fc %>%
+  autoplot(dfUSA) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="Exports", title="US Exports") +
+  guides(colour = "none")
+
+
+```
+
+__*8.5c Compute the RMSE values for the training data.*__
+
+__*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
+
+```{r}
+
+fit <- dfUSA %>%
+  model(ETS(Exports ~ error("A") + trend("A") + season("N")))
+
+fc <- fit %>%
+  forecast(h = 10)
+
+rp <- report(fit)
+
+fc %>%
+  autoplot(dfUSA) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="Exports", title="US Exports") +
+  guides(colour = "none") +
+  geom_segment(aes(x=1960, xend=2016, y=4.8, yend = 11.9),
+               colour = "green")
+
+
+
+
+```
+
+__*8.5e Compare the forecasts from both methods. Which do you think is best?*__
+
+__*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
+
+```{r}
+
+
+
+```
+
+__*8,6 Forecast the Chinese GDP from the global_economy data set using an ETS model. Experiment with the various options in the ETS() function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts. *__
+
+
+```{r}
+library(MASS)
+dfC <- global_economy %>%
+  filter(Country=="China")
+
+z <- autoplot(dfC) + labs(title = "China GDP - No forecast")
+
+
+report_fit <- function(df, fit, xtitle="") {
+fc <- fit %>%
+  forecast(h = 25)
+
+#rp <- report(fit)
+
+q <- fc %>%
+  autoplot(df) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="Exports", title=paste(xtitle)) +
+  guides(colour = "none") 
+
+return(q)
+}
+
+fit <- dfC %>%
+  model(ETS(GDP ~ error("A") + trend("N") + season("N")))
+a <- report_fit(dfC, fit, "China GDP - ANN")
+
+fit <- dfC %>%
+  model(ETS(GDP ~ error("A") + trend("A") + season("N")))
+b <- report_fit(dfC, fit, "China GDP - AAN")
+
+fit <- dfC %>%
+  model(ETS(GDP ~ error("A") + trend("Ad", phi=.95) + season("N")))
+c <- report_fit(dfC, fit, "China GDP - AAdN .95")
+
+fit <- dfC %>%
+  model(ETS(GDP ~ error("A") + trend("Ad", phi=.8) + season("N")))
+d <- report_fit(dfC, fit, "China GDP - AAdN .8")
+
+lambda <- dfC %>%
+  features(GDP, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+fit <- dfC %>%
+  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("A") + season("N")))
+e <- report_fit(dfC, fit, "China GDP - AAN, boxcox")
+
+fit <- dfC %>%
+  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("Ad", phi=.95) + season("N")))
+f <- report_fit(dfC, fit, "China GDP - AAdN .95, boxcox")
+
+z
+
+library(gridExtra)
+grid.arrange(a,b,c,d,e,f, ncol=2)
+
+```
+
+
+__*8.7 Find an ETS model for the Gas data from aus_production and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?*__
+
+```{r}
+
+dfGas <- aus_production %>%
+  dplyr::select(Gas)
+autoplot(dfGas) + labs(title="Gas Production")
+
+fit <- dfGas %>%
+  model(ETS(Gas ~ error("A") + trend("A") + season("A")))
+a1 <- report_fit(dfGas, fit, "AAA")
+
+
+fit <- dfGas %>%
+  model(ETS(Gas ~ error("M") + trend("A") + season("M")))
+b1 <- report_fit(dfGas, fit, "MAM")
+
+lambdaG <- dfGas %>%
+  features(Gas, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+fit <- dfGas %>%
+  model(ETS(box_cox(Gas, lambdaG) ~ error("A") + trend("A") + season("A")))
+c1 <- report_fit(dfGas, fit, "AAA, boxcox")
+
+fit <- dfGas %>%
+  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("A") + season("M")))
+d1 <- report_fit(dfGas, fit, "MAM, boxcox")
+
+fit <- dfGas %>%
+  model(ETS(Gas ~ error("M") + trend("Ad", phi=.8) + season("M")))
+e1 <- report_fit(dfGas, fit, "MAdM, phi=.8")
+
+fit <- dfGas %>%
+  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("Ad", phi=.8) + season("M")))
+f1 <- report_fit(dfGas, fit, "MAdM, boxcox, phi=.8")
+
+grid.arrange(a1,b1,c1,d1,e1,f1, ncol=2)
+```
+
+__*8.8a Recall your retail time series data (from Exercise 8 in Section 2.10).  Why is multiplicative seasonality necessary for this series?*__
+
+
+```{r}
+
+set.seed(042760)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+  fill_gaps() %>%
+  dplyr::select(Turnover) 
+
+myseries %>% autoplot() +labs(title="Australian Retail")
+
+x11_dcmp <- myseries %>%
+  model(x11 = X_13ARIMA_SEATS(Turnover ~ x11())) %>%
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+    "Decomposition of turnover in Australian retail employment using X-11.")
+
+```
+
+__*8.8b Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.*__
+
+```{r}
+
+fit <- myseries %>%
+  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
+a2 <- report_fit(myseries, fit, "Australian Retail - MAM")
+a2
+
+fit <- myseries %>%
+  model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
+b2 <- report_fit(myseries, fit, "Australian Retail - MAdM, phi=.85")
+b2
+```
+
+__*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
+
+__*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
+
+__*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
