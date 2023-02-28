@@ -35,28 +35,30 @@ dfPigs <- aus_livestock %>%
 
 fit <- dfPigs %>%
   model(ETS(Count ~ error("A") + trend("N") + season("N")))
-fc <- fit %>%
+fcx <- fit %>%
   forecast(h = 4)
 
-rp <- report(fit)
-
-fc %>%
+fcx %>%
   autoplot(dfPigs) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit)) +
   labs(y="Count", title="Pigs Slaughtered") +
   guides(colour = "none")
 
+fcx2 <- fit %>%
+  forecast::forecast(h = 4)
+
+
+
+
+report(fit)
 ```
 
 __*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
 
+[ToDo] Mean = 95187 S=sqrt(87480760)=9353.115.  Confidence interval = (82314, 118978).  This range is 
+
 ```{r}
-
-fc
-
-Interval <- fc %>% hilo(95)
-Interval
 
 ```
 
@@ -73,6 +75,8 @@ dfUSA <- global_economy %>%
 autoplot(dfUSA, Exports)
 
 ```
+
+The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
 
 
 __*8.5b Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.*__
@@ -99,7 +103,11 @@ fc %>%
 
 __*8.5c Compute the RMSE values for the training data.*__
 
+[ToDo]
+
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
+
+[ToDo]
 
 ```{r}
 
@@ -127,7 +135,11 @@ fc %>%
 
 __*8.5e Compare the forecasts from both methods. Which do you think is best?*__
 
+[ToDo]
+
 __*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
+
+[ToDo]
 
 ```{r}
 
@@ -137,6 +149,7 @@ __*8.5f Calculate a 95% prediction interval for the first forecast for each mode
 
 __*8,6 Forecast the Chinese GDP from the global_economy data set using an ETS model. Experiment with the various options in the ETS() function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts. *__
 
+Dampening the trend flattens out the prediction.  The lower the phi, the more dampening.  Boxcox changes the confidence intervals.
 
 ```{r}
 library(MASS)
@@ -200,6 +213,9 @@ grid.arrange(a,b,c,d,e,f, ncol=2)
 
 __*8.7 Find an ETS model for the Gas data from aus_production and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?*__
 
+Variance in seasonality is increasing over time, so a multiplicative seasonal estimate is needed. The additive model appears better, but this is because the confidence intervals don't account for the heteroskedasticity. Boxcox improves the model as well.
+
+
 ```{r}
 
 dfGas <- aus_production %>%
@@ -240,6 +256,7 @@ grid.arrange(a1,b1,c1,d1,e1,f1, ncol=2)
 
 __*8.8a Recall your retail time series data (from Exercise 8 in Section 2.10).  Why is multiplicative seasonality necessary for this series?*__
 
+It appears that seasonality has increasing variance, which suggests the need for a multiplicatve model.  However, an x11 decomposition does not bear this out, as variance appears to wane again toward the end of the series.
 
 ```{r}
 
@@ -261,6 +278,8 @@ autoplot(x11_dcmp) +
 ```
 
 __*8.8b Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.*__
+
+The damped tend lowers the seasonal cycle, particularly the second one.
 
 ```{r}
 
