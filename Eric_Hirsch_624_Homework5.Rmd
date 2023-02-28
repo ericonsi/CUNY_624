@@ -31,10 +31,12 @@ __*8.1a Use the ETS() function to estimate the equivalent model for simple expon
 ```{r}
 
 dfPigs <- aus_livestock %>%
-  filter(grepl("Pigs", Animal), State=="Victoria")
+  filter(Animal=="Pigs", State=="Victoria") %>%
+  filter_index("1973 Jan" ~ "2018 Dec")
 
 fit <- dfPigs %>%
   model(ETS(Count ~ error("A") + trend("N") + season("N")))
+
 fcx <- fit %>%
   forecast(h = 4)
 
@@ -49,8 +51,6 @@ fcx2 <- fit %>%
   forecast::forecast(h = 4)
 
 
-
-
 report(fit)
 ```
 
@@ -59,6 +59,9 @@ __*8.1b Compute a 95% prediction interval for the first forecast. Compare your i
 [ToDo] Mean = 95187 S=sqrt(87480760)=9353.115.  Confidence interval = (82314, 118978).  This range is 
 
 ```{r}
+
+fcx %>% hilo(95)
+accuracy(fit, dfPigs)
 
 ```
 
@@ -70,7 +73,7 @@ __*8.5a Plot the Exports series and discuss the main features of the data.*__
 ```{r}
 
 dfUSA <- global_economy %>%
-  filter(grepl("United States", Country), Year<2017) 
+  filter(Country=="United States", Year<2017) 
 
 autoplot(dfUSA, Exports)
 
@@ -103,7 +106,14 @@ fc %>%
 
 __*8.5c Compute the RMSE values for the training data.*__
 
-[ToDo]
+```{r}
+
+
+library(forecast)
+forecast(fit, h = 10) # h is the period that you want to forecast. 
+accuracy(fcx)
+
+```
 
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
 
