@@ -124,6 +124,24 @@ USA_fc <- USA_fit %>%
 
 accuracy(USA_fc, dfUSA)
 
+#-----------------------------
+
+train2 <- dfUSA %>%
+  filter(Year <= 2010) %>%
+  dplyr::select(Exports)
+
+test2 <- dfUSA %>%
+  filter(Year > 2010) %>%
+  dplyr::select(Exports)
+
+USA_fit2 <- HoltWinters(train2$Exports, gamma = FALSE)
+
+#USA_fit <- model(ETS(train ~ error("A") + trend("N") + season("N")))
+  
+nfuture2 <- forecast::forecast(USA_fit2, h = 12)
+
+forecast::accuracy(nfuture2, x=test2)
+
 ```
 
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
@@ -337,3 +355,5 @@ __*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which d
 __*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
 
 __*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
+
+
