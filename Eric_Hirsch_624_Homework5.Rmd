@@ -11,13 +11,11 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```{r}
 
 library(tidyverse)
-library(tsibbledata)
 library(tsibble)
-library(forecast)
 library(fpp3)
-library(fable)
 library(EHData)
 library(gridExtra)
+library(fable)
 
 ```
 
@@ -47,21 +45,23 @@ fcx %>%
   labs(y="Count", title="Pigs Slaughtered") +
   guides(colour = "none")
 
-fcx2 <- fit %>%
-  forecast::forecast(h = 4)
-
 
 report(fit)
+q <- fcx$.mean
+q[1]
 ```
 
 __*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
 
-[ToDo] Mean = 95187 S=sqrt(87480760)=9353.115.  Confidence interval = (82314, 118978).  This range is 
+We can see from the report that the mean is 95183 and the variance is 87367846, thus the sd is the sqrt of the variance = 9347.  The confidence interval is mean +- 1.96*sqrt(sd) = (76863, 113503). 
+
+The interval matches that calculated by R.
+
 
 ```{r}
 
-fcx %>% hilo(95)
-accuracy(fit, dfPigs)
+hl <- fcx %>%  hilo()
+hl$`95%`[1]
 
 ```
 
@@ -69,6 +69,9 @@ accuracy(fit, dfPigs)
 __*8.5 Data set global_economy contains the annual Exports from many countries. Select one country to analyse.*__
 
 __*8.5a Plot the Exports series and discuss the main features of the data.*__
+
+
+The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
 
 ```{r}
 
@@ -78,8 +81,6 @@ dfUSA <- global_economy %>%
 autoplot(dfUSA, Exports)
 
 ```
-
-The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
 
 
 __*8.5b Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.*__
@@ -106,30 +107,40 @@ fc %>%
 
 __*8.5c Compute the RMSE values for the training data.*__
 
+The question suggests we need to split the dataset into training and test, so we do that and compute the RMSE value.  The RMSE is 1.232.
+
+
 ```{r}
 
 
-library(forecast)
-forecast(fit, h = 10) # h is the period that you want to forecast. 
-accuracy(fcx)
+USA_train <- dfUSA %>%
+  filter(Year <= 2010)
+
+USA_fit <- USA_train %>%
+  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+  
+USA_fc <- USA_fit %>%
+  forecast(h = 4)
+
+accuracy(USA_fc, dfUSA)
 
 ```
 
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
 
-[ToDo]
+The AAN model accounts for the trend, which matches almost exactly a line form first to last datapoint (the green line).  The ANN model recognizes the cycling up and down of the data and in the short term is probably better because the data is in a down cycle.  AAN better accounts for the overall trend, which is up.
 
 ```{r}
 
-fit <- dfUSA %>%
+fit_AAN <- dfUSA %>%
   model(ETS(Exports ~ error("A") + trend("A") + season("N")))
 
-fc <- fit %>%
+fc_AAN <- fit_AAN %>%
   forecast(h = 10)
 
 rp <- report(fit)
 
-fc %>%
+fc_AAN %>%
   autoplot(dfUSA) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit)) +
@@ -145,15 +156,30 @@ fc %>%
 
 __*8.5e Compare the forecasts from both methods. Which do you think is best?*__
 
-[ToDo]
+It depends on the business case.  Since the data exhibits significant cycling with an inconsistent period, it may be better for very short term business cases (like hiring for next summer) to ignore the trend ad perorm ANN (in fact, the overall trend is up but the current trend is down).  For a longer perspective (say building facilities) I would be more inclined to trust the trend (AAN).
 
 __*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
 
-[ToDo]
+ANN: Mean = 11.891, sd = .63834, ci = (10.64, 13.14).
+
+AAN: Mean = 12.001, sd = .63849, ci = (10.75, 13.25)
+The intervals match those of R. They are very similar - however, it is telling that the parameter that accounts for trend has a slightly larger CI.
+
 
 ```{r}
+report(fit)
+q <- fc$.mean
+q[1]
 
+report(fit_AAN)
+q1 <- fc_AAN$.mean
+q1[1]
 
+h2 <- fc %>%  hilo()
+h2$`95%`[1]
+
+h3 <- fc_AAN %>%  hilo()
+h3$`95%`[1]
 
 ```
 
@@ -266,7 +292,7 @@ grid.arrange(a1,b1,c1,d1,e1,f1, ncol=2)
 
 __*8.8a Recall your retail time series data (from Exercise 8 in Section 2.10).  Why is multiplicative seasonality necessary for this series?*__
 
-It appears that seasonality has increasing variance, which suggests the need for a multiplicatve model.  However, an x11 decomposition does not bear this out, as variance appears to wane again toward the end of the series.
+It appears that seasonality has increasing variance, which suggests the need for a multiplicative model.  Interestingly, an x11 decomposition does not bear this out, as variance appears to wane again toward the end of the series.
 
 ```{r}
 
@@ -305,6 +331,8 @@ b2
 ```
 
 __*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
+
+
 
 __*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
 
