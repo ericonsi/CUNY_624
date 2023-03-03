@@ -140,8 +140,6 @@ USA_fit2 <- HoltWinters(train2$Exports, gamma = FALSE)
   
 nfuture2 <- forecast::forecast(USA_fit2, h = 12)
 
-forecast::accuracy(nfuture2, x=test2)
-
 ```
 
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
@@ -337,23 +335,106 @@ The damped tend lowers the seasonal cycle, particularly the second one.
 
 ```{r}
 
-fit <- myseries %>%
+fit1 <- myseries %>%
   model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-a2 <- report_fit(myseries, fit, "Australian Retail - MAM")
+a2 <- report_fit(myseries, fit1, "Australian Retail - MAM")
 a2
 
-fit <- myseries %>%
+fit2 <- myseries %>%
   model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
-b2 <- report_fit(myseries, fit, "Australian Retail - MAdM, phi=.85")
+b2 <- report_fit(myseries, fit2, "Australian Retail - MAdM, phi=.85")
 b2
 ```
 
 __*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
 
+The RMSE for the undamped trend is lower.  I see no reason to prefer the damped trend.
+```{r}
+
+ms_train <- myseries %>%
+  filter(year(Month) <= 2010)
+
+ms_fit <- ms_train %>%
+  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
+  
+ms_fc <- ms_fit %>%
+  forecast(h = 1)
+
+accuracy(ms_fc, myseries)
+
+ms_fit2 <- ms_train %>%
+    model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
+  
+ms_fc2 <- ms_fit2 %>%
+  forecast(h = 1)
+
+accuracy(ms_fc2, myseries)
+```
 
 
 __*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
 
+The residuals do not show any particular patterning.  The RMSE for the ETS model is .57, which is lower than the Naive model (7.0) by more than a factor of 10.
+
+```{r}
+
+fit_SNAIVE <- ms_train %>%
+  model(SNAIVE())
+
+fc_SNAIVE <- fit_SNAIVE %>%
+  forecast(new_data = anti_join(myseries, ms_train))
+
+
+accuracy(ms_fc, myseries)
+accuracy(fc_SNAIVE, myseries)
+
+```
+
+
 __*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
 
+The RMSE for the seasonalally adjusted data is 1.55 - between the other two.  It is not lower, and therefore we reject it.
+
+```{r}
+
+set.seed(042760)
+
+  lambda <- myseries %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+  myseries_boxcox <- myseries %>% 
+  mutate(Turnover=box_cox(Turnover, lambda))
+
+  stl<- myseries_boxcox %>%
+  stl(s.window ="periodic")
+
+autoplot(stl) +
+  labs(title =
+    "Decomposition of turnover in Australian retail employment using STL.")
+
+tsTrend <- as.data.frame(stl$time.series) %>%
+  cbind(myseries) %>%
+  as_tsibble(index=Month) %>%
+  dplyr::select(Month, trend)
+
+autoplot(tsTrend)
+
+  ms_trainBC <- tsTrend %>%
+  filter(year(Month) <= 2010)
+  
+  ms_testBC <- tsTrend %>%
+  filter(year(Month) > 2010)
+  
+fit_BC <- ms_trainBC %>%
+  model(ETS(trend ~ error("A") + trend("A") + season("N")))
+
+fc_BC_Test <- fit_BC %>%
+  forecast(new_data = anti_join(tsTrend, ms_trainBC))
+
+#accuracy(fit_BC, myseries)
+accuracy(fc_BC_Test, tsTrend)
+
+
+```
 
