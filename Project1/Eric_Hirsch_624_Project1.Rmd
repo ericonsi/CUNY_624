@@ -31,8 +31,8 @@ dfATM <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project1\\ATM624Data.x
 summary(dfATM)
 str(dfATM)
 
-tsATM2 <- dfATM %>%
-  filter(ATM=="ATM2")%>%
+tsATM1 <- dfATM %>%
+  filter(ATM=="ATM1")%>%
   mutate(xDate=as_date(DATE)) %>%
   as_tsibble(index=xDate) %>%
   dplyr::select(xDate, Cash)
@@ -64,462 +64,348 @@ Handle Missings
 
 which(is.na(tsATM1$Cash))
 
-x43 <- filter(tsATM1, row_number() == 43)
-x45 <- filter(tsATM1, row_number() == 45)
-Cash44 = (x43$Cash+x45$Cash)/2
+InterpolateBetweenRows <- function(df, column, rowNumber) {
 
-x46 <- filter(tsATM1, row_number() == 46)
-x48 <- filter(tsATM1, row_number() == 48)
-Cash47 = (x46$Cash+x48$Cash)/2
+lo = rowNumber-1
+hi = rowNumber+1
 
-x52 <- filter(tsATM1, row_number() == 52)
-x54 <- filter(tsATM1, row_number() == 54)
-Cash53 = (x52$Cash+x54$Cash)/2
+df1 <- filter(df, row_number() == lo)
+df2 <- filter(df, row_number() == hi)
+x = (df1[,column] + df2[,column])/2
+df[rowNumber, column] = x
+return (df)
 
-tsATM1a <- tsATM1 %>%
-  mutate(Cash=ifelse(row_number() == 44, Cash44, Cash)) %>%
-    mutate(Cash=ifelse(row_number() == 47, Cash47, Cash)) %>%
-    mutate(Cash=ifelse(row_number() == 53, Cash53, Cash))
+
+}
+
+q <- InterpolateBetweenRows(tsATM1, "Cash", 44)
+q2 <- InterpolateBetweenRows(q, "Cash", 47)
+q3 <- InterpolateBetweenRows(q2, "Cash", 53)
+tsATM1a <- q3
+
+which(is.na(tsATM2$Cash))
+
+qq <- InterpolateBetweenRows(tsATM2, "Cash", 49)
+qq2 <- InterpolateBetweenRows(qq, "Cash", 55)
+tsATM2a <- qq2
+```
+Outliers
+
+```{r}
+dfCash1 <- as.data.frame(tsATM1a$Cash)
+EHSummarize_SingleColumn_Boxplots(dfCash1)
+EHSummarize_SingleColumn_Histograms(dfCash1)
+
 
 ```
-```{r}
 
-tsATM1b <- tsATM1a %>%
-  group_by(Year=year(xDate), Month=month(xDate)) %>%
-  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
-  mutate(xDate=paste(Year,"-",Month))
+Turn to monthly
+```{r}
   
+tsATM1b <- tsATM1a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
 
 autoplot(tsATM1a)
+autoplot(tsATM1b)
 
   stl<- tsATM1a %>%
   stl(s.window ="periodic")
   autoplot(stl)
 
 ```
-```{r}
-
-
-
-```
-
-
-8.1, 8.5, 8.6, 8.7, 8.8, 8.9
-
-__*8.1 Consider the the number of pigs slaughtered in Victoria, available in the aus_livestock dataset.*__
-
-__*8.1a Use the ETS() function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of α and ℓ, and generate forecasts for the next four months.*__
 
 
 ```{r}
 
-dfPigs <- aus_livestock %>%
-  filter(Animal=="Pigs", State=="Victoria") %>%
-  filter_index("1973 Jan" ~ "2018 Dec")
+train1m <- tsATM1b %>%
+  filter_index(~ "2010 Feb")
 
-fit <- dfPigs %>%
-  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+fit1m <- tsATM1b %>%
+  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
+  
+fc1m <- fit1m %>%
+  forecast(h = 3)
 
-fcx <- fit %>%
-  forecast(h = 4)
-
-fcx %>%
-  autoplot(dfPigs) +
+fc1m %>%
+  autoplot(tsATM1b) +
   geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Count", title="Pigs Slaughtered") +
+            data = augment(fit1m)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
   guides(colour = "none")
 
-
-report(fit)
-q <- fcx$.mean
-q[1]
-```
-
-__*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
-
-We can see from the report that the mean is 95183 and the variance is 87367846, thus the sd is the sqrt of the variance = 9347.  The confidence interval is mean +- 1.96*sqrt(sd) = (76863, 113503). 
-
-The interval matches that calculated by R.
-
-
-```{r}
-
-hl <- fcx %>%  hilo()
-hl$`95%`[1]
+report(fit1m)
+fc1m$.mean
 
 ```
-
-
-__*8.5 Data set global_economy contains the annual Exports from many countries. Select one country to analyse.*__
-
-__*8.5a Plot the Exports series and discuss the main features of the data.*__
-
-
-The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
+do it a daily
 
 ```{r}
+fit1d <- tsATM1a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+  
+fc1d <- fit1d %>%
+  forecast(h = 31)
 
-dfUSA <- global_economy %>%
-  filter(Country=="United States", Year<2017) 
-
-autoplot(dfUSA, Exports)
-
-```
-
-
-__*8.5b Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.*__
-
-```{r}
-
-fit <- dfUSA %>%
-  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
-
-fc <- fit %>%
-  forecast(h = 10)
-
-rp <- report(fit)
-
-fc %>%
-  autoplot(dfUSA) +
+fc1d %>%
+  autoplot(tsATM1a) +
   geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title="US Exports") +
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAA") +
   guides(colour = "none")
 
+report(fit1d)
+sum(fc1d$.mean)
+
+
 
 ```
 
-__*8.5c Compute the RMSE values for the training data.*__
-
-The question suggests we need to split the dataset into training and test, so we do that and compute the RMSE value.  The RMSE is 1.232.
-
+Outliers
 
 ```{r}
 
+summary(tsATM4)
+dfCash4 <- as.data.frame(tsATM4$Cash)
+EHSummarize_SingleColumn_Boxplots(dfCash4)
+EHSummarize_SingleColumn_Histograms(dfCash4)
 
-USA_train <- dfUSA %>%
-  filter(Year <= 2010)
 
-USA_fit <- USA_train %>%
-  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+```
+Remove outlier
+
+```{r}
+
+tsATM4a <- tsATM4  %>%
+  mutate(Cash=ifelse(Cash>10000, 109, Cash))
+
+```
+
+Turn to monthly
+```{r}
   
-USA_fc <- USA_fit %>%
-  forecast(h = 4)
-
-accuracy(USA_fc, dfUSA)
-
-#-----------------------------
-
-train2 <- dfUSA %>%
-  filter(Year <= 2010) %>%
-  dplyr::select(Exports)
-
-test2 <- dfUSA %>%
-  filter(Year > 2010) %>%
-  dplyr::select(Exports)
-
-USA_fit2 <- HoltWinters(train2$Exports, gamma = FALSE)
-
-#USA_fit <- model(ETS(train ~ error("A") + trend("N") + season("N")))
-  
-nfuture2 <- forecast::forecast(USA_fit2, h = 12)
-
-```
-
-__*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
-
-The AAN model accounts for the trend, which matches almost exactly a line form first to last datapoint (the green line).  The ANN model recognizes the cycling up and down of the data and in the short term is probably better because the data is in a down cycle.  AAN better accounts for the overall trend, which is up.
-
-```{r}
-
-fit_AAN <- dfUSA %>%
-  model(ETS(Exports ~ error("A") + trend("A") + season("N")))
-
-fc_AAN <- fit_AAN %>%
-  forecast(h = 10)
-
-rp <- report(fit)
-
-fc_AAN %>%
-  autoplot(dfUSA) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title="US Exports") +
-  guides(colour = "none") +
-  geom_segment(aes(x=1960, xend=2016, y=4.8, yend = 11.9),
-               colour = "green")
-
-
-
-
-```
-
-__*8.5e Compare the forecasts from both methods. Which do you think is best?*__
-
-It depends on the business case.  Since the data exhibits significant cycling with an inconsistent period, it may be better for very short term business cases (like hiring for next summer) to ignore the trend ad perorm ANN (in fact, the overall trend is up but the current trend is down).  For a longer perspective (say building facilities) I would be more inclined to trust the trend (AAN).
-
-__*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
-
-ANN: Mean = 11.891, sd = .63834, ci = (10.64, 13.14).
-
-AAN: Mean = 12.001, sd = .63849, ci = (10.75, 13.25)
-The intervals match those of R. They are very similar - however, it is telling that the parameter that accounts for trend has a slightly larger CI.
-
-
-```{r}
-report(fit)
-q <- fc$.mean
-q[1]
-
-report(fit_AAN)
-q1 <- fc_AAN$.mean
-q1[1]
-
-h2 <- fc %>%  hilo()
-h2$`95%`[1]
-
-h3 <- fc_AAN %>%  hilo()
-h3$`95%`[1]
-
-```
-
-__*8,6 Forecast the Chinese GDP from the global_economy data set using an ETS model. Experiment with the various options in the ETS() function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts. *__
-
-Dampening the trend flattens out the prediction.  The lower the phi, the more dampening.  Boxcox changes the confidence intervals.
-
-```{r}
-library(MASS)
-dfC <- global_economy %>%
-  filter(Country=="China")
-
-z <- autoplot(dfC) + labs(title = "China GDP - No forecast")
-
-
-report_fit <- function(df, fit, xtitle="") {
-fc <- fit %>%
-  forecast(h = 25)
-
-#rp <- report(fit)
-
-q <- fc %>%
-  autoplot(df) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title=paste(xtitle)) +
-  guides(colour = "none") 
-
-return(q)
-}
-
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("N") + season("N")))
-a <- report_fit(dfC, fit, "China GDP - ANN")
-
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("A") + season("N")))
-b <- report_fit(dfC, fit, "China GDP - AAN")
-
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("Ad", phi=.95) + season("N")))
-c <- report_fit(dfC, fit, "China GDP - AAdN .95")
-
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("Ad", phi=.8) + season("N")))
-d <- report_fit(dfC, fit, "China GDP - AAdN .8")
-
-lambda <- dfC %>%
-  features(GDP, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-fit <- dfC %>%
-  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("A") + season("N")))
-e <- report_fit(dfC, fit, "China GDP - AAN, boxcox")
-
-fit <- dfC %>%
-  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("Ad", phi=.95) + season("N")))
-f <- report_fit(dfC, fit, "China GDP - AAdN .95, boxcox")
-
-z
-
-library(gridExtra)
-grid.arrange(a,b,c,d,e,f, ncol=2)
-
-```
-
-
-__*8.7 Find an ETS model for the Gas data from aus_production and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?*__
-
-Variance in seasonality is increasing over time, so a multiplicative seasonal estimate is needed. The additive model appears better, but this is because the confidence intervals don't account for the heteroskedasticity. Boxcox improves the model as well.
-
-
-```{r}
-
-dfGas <- aus_production %>%
-  dplyr::select(Gas)
-autoplot(dfGas) + labs(title="Gas Production")
-
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("A") + trend("A") + season("A")))
-a1 <- report_fit(dfGas, fit, "AAA")
-
-
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("M") + trend("A") + season("M")))
-b1 <- report_fit(dfGas, fit, "MAM")
-
-lambdaG <- dfGas %>%
-  features(Gas, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("A") + trend("A") + season("A")))
-c1 <- report_fit(dfGas, fit, "AAA, boxcox")
-
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("A") + season("M")))
-d1 <- report_fit(dfGas, fit, "MAM, boxcox")
-
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("M") + trend("Ad", phi=.8) + season("M")))
-e1 <- report_fit(dfGas, fit, "MAdM, phi=.8")
-
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("Ad", phi=.8) + season("M")))
-f1 <- report_fit(dfGas, fit, "MAdM, boxcox, phi=.8")
-
-grid.arrange(a1,b1,c1,d1,e1,f1, ncol=2)
-```
-
-__*8.8a Recall your retail time series data (from Exercise 8 in Section 2.10).  Why is multiplicative seasonality necessary for this series?*__
-
-It appears that seasonality has increasing variance, which suggests the need for a multiplicative model.  Interestingly, an x11 decomposition does not bear this out, as variance appears to wane again toward the end of the series.
-
-```{r}
-
-set.seed(042760)
-myseries <- aus_retail %>%
-  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
-  fill_gaps() %>%
-  dplyr::select(Turnover) 
-
-myseries %>% autoplot() +labs(title="Australian Retail")
-
-x11_dcmp <- myseries %>%
-  model(x11 = X_13ARIMA_SEATS(Turnover ~ x11())) %>%
-  components()
-autoplot(x11_dcmp) +
-  labs(title =
-    "Decomposition of turnover in Australian retail employment using X-11.")
-
-```
-
-__*8.8b Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.*__
-
-The damped tend lowers the seasonal cycle, particularly the second one.
-
-```{r}
-
-fit1 <- myseries %>%
-  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-a2 <- report_fit(myseries, fit1, "Australian Retail - MAM")
-a2
-
-fit2 <- myseries %>%
-  model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
-b2 <- report_fit(myseries, fit2, "Australian Retail - MAdM, phi=.85")
-b2
-```
-
-__*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
-
-The RMSE for the undamped trend is lower.  I see no reason to prefer the damped trend.
-```{r}
-
-ms_train <- myseries %>%
-  filter(year(Month) <= 2010)
-
-ms_fit <- ms_train %>%
-  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-  
-ms_fc <- ms_fit %>%
-  forecast(h = 1)
-
-accuracy(ms_fc, myseries)
-
-ms_fit2 <- ms_train %>%
-    model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
-  
-ms_fc2 <- ms_fit2 %>%
-  forecast(h = 1)
-
-accuracy(ms_fc2, myseries)
-```
-
-
-__*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
-
-The residuals do not show any particular patterning.  The RMSE for the ETS model is .57, which is lower than the Naive model (7.0) by more than a factor of 10.
-
-```{r}
-
-fit_SNAIVE <- ms_train %>%
-  model(SNAIVE())
-
-fc_SNAIVE <- fit_SNAIVE %>%
-  forecast(new_data = anti_join(myseries, ms_train))
-
-
-accuracy(ms_fc, myseries)
-accuracy(fc_SNAIVE, myseries)
-
-```
-
-
-__*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
-
-The RMSE for the seasonalally adjusted data is 1.55 - between the other two.  It is not lower, and therefore we reject it.
-
-```{r}
-
-set.seed(042760)
-
-  lambda <- myseries %>%
-  features(Turnover, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-  myseries_boxcox <- myseries %>% 
-  mutate(Turnover=box_cox(Turnover, lambda))
-
-  stl<- myseries_boxcox %>%
+tsATM4b <- tsATM4a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+autoplot(tsATM4a)
+autoplot(tsATM4b)
+
+  stl<- tsATM4a %>%
   stl(s.window ="periodic")
+  autoplot(stl)
 
-autoplot(stl) +
-  labs(title =
-    "Decomposition of turnover in Australian retail employment using STL.")
+```
 
-tsTrend <- as.data.frame(stl$time.series) %>%
-  cbind(myseries) %>%
-  as_tsibble(index=Month) %>%
-  dplyr::select(Month, trend)
 
-autoplot(tsTrend)
+```{r}
 
-  ms_trainBC <- tsTrend %>%
-  filter(year(Month) <= 2010)
+train4m <- tsATM4b %>%
+  filter_index(~ "2010 Feb")
+
+fit4m <- tsATM4b %>%
+  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
   
-  ms_testBC <- tsTrend %>%
-  filter(year(Month) > 2010)
+fc4m <- fit4m %>%
+  forecast(h = 3)
+
+fc4m %>%
+  autoplot(tsATM4b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4m)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit4m)
+fc4m$.mean
+
+```
+do it a daily
+
+```{r}
+fit4d <- tsATM4a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
   
-fit_BC <- ms_trainBC %>%
-  model(ETS(trend ~ error("A") + trend("A") + season("N")))
+fc4d <- fit4d %>%
+  forecast(h = 31)
 
-fc_BC_Test <- fit_BC %>%
-  forecast(new_data = anti_join(tsTrend, ms_trainBC))
+fc4d %>%
+  autoplot(tsATM4a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAA") +
+  guides(colour = "none")
 
-#accuracy(fit_BC, myseries)
-accuracy(fc_BC_Test, tsTrend)
+report(fit4d)
+sum(fc4d$.mean)
+
 
 
 ```
+
+
+Outliers
+
+```{r}
+
+summary(tsATM2a)
+dfCash2 <- as.data.frame(tsATM2a$Cash)
+EHSummarize_SingleColumn_Boxplots(dfCash2)
+EHSummarize_SingleColumn_Histograms(dfCash2)
+
+
+```
+
+Turn to monthly
+```{r}
+  
+tsATM2b <- tsATM2a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+autoplot(tsATM2a)
+autoplot(tsATM2b)
+
+  stl<- tsATM2a %>%
+  stl(s.window ="periodic")
+  autoplot(stl)
+
+```
+
+
+```{r}
+
+train2m <- tsATM2b %>%
+  filter_index(~ "2010 Feb")
+
+fit2m <- tsATM2b %>%
+  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
+  
+fc2m <- fit2m %>%
+  forecast(h = 3)
+
+fc2m %>%
+  autoplot(tsATM2b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit2m)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit2m)
+fc2m$.mean
+
+```
+do it a daily
+
+```{r}
+fit4d <- tsATM4a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+  
+fc4d <- fit4d %>%
+  forecast(h = 31)
+
+fc4d %>%
+  autoplot(tsATM4a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAA") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4d$.mean)
+
+
+
+```
+
+Outliers
+
+```{r}
+
+summary(tsATM3)
+dfCash3 <- as.data.frame(tsATM3$Cash)
+EHSummarize_SingleColumn_Boxplots(dfCash3)
+EHSummarize_SingleColumn_Histograms(dfCash3)
+
+
+```
+Remove outlier
+
+```{r}
+
+tsATM4a <- tsATM4  %>%
+  mutate(Cash=ifelse(Cash>10000, 109, Cash))
+
+```
+
+Turn to monthly
+```{r}
+  
+tsATM4b <- tsATM4a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+autoplot(tsATM4a)
+autoplot(tsATM4b)
+
+  stl<- tsATM4a %>%
+  stl(s.window ="periodic")
+  autoplot(stl)
+
+```
+
+
+```{r}
+
+train4m <- tsATM4b %>%
+  filter_index(~ "2010 Feb")
+
+fit4m <- tsATM4b %>%
+  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
+  
+fc4m <- fit4m %>%
+  forecast(h = 3)
+
+fc4m %>%
+  autoplot(tsATM4b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4m)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit4m)
+fc4m$.mean
+
+```
+do it a daily
+
+```{r}
+fit4d <- tsATM4a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+  
+fc4d <- fit4d %>%
+  forecast(h = 31)
+
+fc4d %>%
+  autoplot(tsATM4a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4d$.mean)
+
+
+
+```
+
 
