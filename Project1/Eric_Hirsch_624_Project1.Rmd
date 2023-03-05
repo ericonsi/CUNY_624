@@ -28,9 +28,6 @@ dfATM <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project1\\ATM624Data.x
 
 ```{r}
 
-summary(dfATM)
-str(dfATM)
-
 tsATM1 <- dfATM %>%
   filter(ATM=="ATM1")%>%
   mutate(xDate=as_date(DATE)) %>%
@@ -108,20 +105,17 @@ tsATM1b <- tsATM1a %>%
   dplyr::summarize(MonthlyCash=sum(Cash)) %>%
   as_tsibble(index="Month")
 
-autoplot(tsATM1a)
-autoplot(tsATM1b)
+forecast::autoplot(tsATM1a)
+forecast::autoplot(tsATM1b)
 
   stl<- tsATM1a %>%
   stl(s.window ="periodic")
-  autoplot(stl)
+  forecast::autoplot(stl)
 
 ```
-
+Test  Models
 
 ```{r}
-
-train1m <- tsATM1b %>%
-  filter_index(~ "2010 Feb")
 
 fit1m <- tsATM1b %>%
   model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
@@ -130,7 +124,7 @@ fc1m <- fit1m %>%
   forecast(h = 3)
 
 fc1m %>%
-  autoplot(tsATM1b) +
+  forecast::autoplot(tsATM1b) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit1m)) +
   labs(y="Count", title="ATM1 - ETS AAN") +
@@ -139,7 +133,9 @@ fc1m %>%
 report(fit1m)
 fc1m$.mean
 
+
 ```
+
 do it a daily
 
 ```{r}
@@ -150,7 +146,7 @@ fc1d <- fit1d %>%
   forecast(h = 31)
 
 fc1d %>%
-  autoplot(tsATM1a) +
+  forecast::autoplot(tsATM1a) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit1d)) +
   labs(y="Count", title="ATM1 - ETS AAA") +
@@ -162,6 +158,150 @@ sum(fc1d$.mean)
 
 
 ```
+Test  Models 1
+
+```{r}
+train1 <- tsATM1a %>%
+  filter_index(~ "2010-01-31")
+
+test1 <- tsATM1a %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+forecast::autoplot(tsATM1a, Cash) +
+  autolayer(train1, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
+
+
+```
+
+SNAIVE
+
+Test RMSE = 49
+
+```{r}
+
+fit <- train1 %>%
+  model(SNAIVE())
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(new_data = anti_join(tsATM1a, train1))
+fc %>% forecast::autoplot(tsATM1a) + labs(title = "ATM1, Training Data is < January") 
+
+fit %>% accuracy()
+fc %>% accuracy(test1)
+```
+ETS AAN 
+
+RMSE 36
+
+```{r}
+
+fit <- train1 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(new_data = anti_join(tsATM1a, train1))
+fc %>% forecast::autoplot(tsATM1a) + labs(title = "ATM1, Training Data is < January") 
+
+fit %>% accuracy()
+fc %>% accuracy(test1)
+```
+
+ETS AAA
+
+RMSE 50
+
+```{r}
+
+fit <- train1 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(new_data = anti_join(tsATM1a, train1))
+fc %>% forecast::autoplot(tsATM1a) + labs(title = "ATM1, Training Data is < January") 
+
+fit %>% accuracy()
+fc %>% accuracy(test1)
+```
+ETS AAdA (.85)
+
+RMSE 49.9
+
+```{r}
+
+fit <- train1 |>
+  model(ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")))
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(new_data = anti_join(tsATM1a, train1))
+fc %>% forecast::autoplot(tsATM1a) + labs(title = "ATM1, Training Data is < January") 
+
+fit %>% accuracy()
+fc %>% accuracy(test1)
+```
+Boxcox AAN
+37.7
+
+```{r}
+
+lambda <- tsATM1a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM1a_boxcox <- tsATM1a %>% 
+  mutate(Cash=box_cox(Cash, lambda))
+
+train1_boxcox <- tsATM1a %>%
+  filter_index(~ "2010-01-31")
+
+fit <- train1_boxcox %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(new_data = anti_join(tsATM1a_boxcox, train1_boxcox))
+fc %>% forecast::autoplot(tsATM1a_boxcox) + labs(title = "ATM1, Training Data is < January") 
+
+fit %>% accuracy()
+fc %>% accuracy(test1)
+
+```
+
+Apply best model to test data
+2470 for May
+
+
+
+```{r}
+fit1d <- tsATM1a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+  
+fc1d <- fit1d %>%
+  forecast(h = 31)
+
+fc1d %>%
+  forecast::autoplot(tsATM1a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit1d)
+sum(fc1d$.mean)
+
+
+```
+
 
 Outliers
 
@@ -192,12 +332,12 @@ tsATM4b <- tsATM4a %>%
   dplyr::summarize(MonthlyCash=sum(Cash)) %>%
   as_tsibble(index="Month")
 
-autoplot(tsATM4a)
-autoplot(tsATM4b)
+forecast::autoplot(tsATM4a)
+forecast::autoplot(tsATM4b)
 
   stl<- tsATM4a %>%
   stl(s.window ="periodic")
-  autoplot(stl)
+  forecast::autoplot(stl)
 
 ```
 
@@ -214,7 +354,7 @@ fc4m <- fit4m %>%
   forecast(h = 3)
 
 fc4m %>%
-  autoplot(tsATM4b) +
+  forecast::autoplot(tsATM4b) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit4m)) +
   labs(y="Count", title="ATM1 - ETS AAN") +
@@ -227,26 +367,168 @@ fc4m$.mean
 do it a daily
 
 ```{r}
-fit4d <- tsATM4a %>%
+fit4 <- tsATM4a %>%
   model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+  
+fc4 <- fit4 %>%
+  forecast(h = 31)
+
+fc4 %>%
+  forecast::autoplot(tsATM4a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM4 - ETS AAA") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4$.mean)
+
+
+
+```
+Test  Models 4
+
+```{r}
+train4 <- tsATM4a %>%
+  filter_index(~ "2010-01-31")
+
+test4 <- tsATM4a %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+forecast::autoplot(tsATM4a, Cash) +
+  autolayer(train1, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
+
+
+```
+
+SNAIVE
+
+Test RMSE = 605.69
+
+```{r}
+
+fit4 <- train4 %>%
+  model(SNAIVE())
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+fc %>% forecast::autoplot(tsATM4a) + labs(title = "ATM1, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+```
+ETS AAN 
+
+RMSE 306.41
+
+```{r}
+
+fit4 <- train4 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+fc %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+```
+
+ETS AAA
+
+RMSE 376.37
+
+```{r}
+
+fit4 <- train4 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+fc4 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+```
+ETS AAdA (.85)
+
+RMSE 373.92
+
+```{r}
+
+fit4 <- train4 |>
+  model(ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+fc4 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+```
+Boxcox AAN
+309.58
+
+```{r}
+
+lambda <- tsATM4a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM4a_boxcox <- tsATM4a %>% 
+  mutate(Cash=box_cox(Cash, lambda))
+
+train4_boxcox <- tsATM4a %>%
+  filter_index(~ "2010-01-31")
+
+fit4 <- train4_boxcox %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a_boxcox, train4_boxcox))
+fc %>% forecast::autoplot(tsATM4a_boxcox) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+
+```
+
+Apply best model to test data
+2470 for May
+
+
+
+```{r}
+fit4d <- tsATM4a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
   
 fc4d <- fit4d %>%
   forecast(h = 31)
 
 fc4d %>%
-  autoplot(tsATM4a) +
+  forecast::autoplot(tsATM4a) +
   geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit1d)) +
-  labs(y="Count", title="ATM1 - ETS AAA") +
+            data = augment(fit4d)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
   guides(colour = "none")
 
 report(fit4d)
 sum(fc4d$.mean)
 
 
-
 ```
-
 
 Outliers
 
@@ -269,12 +551,12 @@ tsATM2b <- tsATM2a %>%
   dplyr::summarize(MonthlyCash=sum(Cash)) %>%
   as_tsibble(index="Month")
 
-autoplot(tsATM2a)
-autoplot(tsATM2b)
+forecast::autoplot(tsATM2a)
+forecast::autoplot(tsATM2b)
 
   stl<- tsATM2a %>%
   stl(s.window ="periodic")
-  autoplot(stl)
+  forecast::autoplot(stl)
 
 ```
 
@@ -291,7 +573,7 @@ fc2m <- fit2m %>%
   forecast(h = 3)
 
 fc2m %>%
-  autoplot(tsATM2b) +
+  forecast::autoplot(tsATM2b) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit2m)) +
   labs(y="Count", title="ATM1 - ETS AAN") +
@@ -304,25 +586,172 @@ fc2m$.mean
 do it a daily
 
 ```{r}
-fit4d <- tsATM4a %>%
+fit2d <- tsATM2a %>%
   model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+  
+fc2d <- fit2d %>%
+  forecast(h = 31)
+
+fc2d %>%
+  forecast::autoplot(tsATM2a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit2d)) +
+  labs(y="Count", title="ATM2 - ETS AAA") +
+  guides(colour = "none")
+
+report(fit2d)
+sum(fc2d$.mean)
+
+
+
+```
+
+Test  Models 2
+
+```{r}
+train2 <- tsATM2a %>%
+  filter_index(~ "2010-01-31")
+
+test2 <- tsATM2a %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+forecast::autoplot(tsATM2a, Cash) +
+  autolayer(train2, Cash, colour = "red") + labs(title = "ATM2, Training Data is < January") 
+
+
+```
+
+SNAIVE
+
+Test RMSE = 58.58
+
+```{r}
+
+fit2 <- train2 %>%
+  model(SNAIVE())
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+
+fc2 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM2, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
+ETS AAN 
+
+RMSE 39.43
+
+```{r}
+
+fit2 <- train2 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM2a, train2))
+fc %>% forecast::autoplot(tsATM2a) + labs(title = "ATM2, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
+
+ETS AAA
+
+RMSE 59.28
+
+```{r}
+
+fit2 <- train2 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM2a, train2))
+fc2 %>% forecast::autoplot(tsATM2a) + labs(title = "ATM4, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
+ETS AAdA (.85)
+
+RMSE 373.92
+
+```{r}
+
+fit4 <- train4 |>
+  model(ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+fc4 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+```
+Boxcox AAN
+309.58
+
+```{r}
+
+lambda <- tsATM4a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM4a_boxcox <- tsATM4a %>% 
+  mutate(Cash=box_cox(Cash, lambda))
+
+train4_boxcox <- tsATM4a %>%
+  filter_index(~ "2010-01-31")
+
+fit4 <- train4_boxcox %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit4 %>% gg_tsresiduals()
+
+fc4 <- fit4 %>%
+  forecast(new_data = anti_join(tsATM4a_boxcox, train4_boxcox))
+fc %>% forecast::autoplot(tsATM4a_boxcox) + labs(title = "ATM4, Training Data is < January") 
+
+fit4 %>% accuracy()
+fc4 %>% accuracy(test4)
+
+```
+
+Apply best model to test data
+2470 for May
+
+
+
+```{r}
+fit4d <- tsATM4a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
   
 fc4d <- fit4d %>%
   forecast(h = 31)
 
 fc4d %>%
-  autoplot(tsATM4a) +
+  forecast::autoplot(tsATM4a) +
   geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit1d)) +
-  labs(y="Count", title="ATM1 - ETS AAA") +
+            data = augment(fit4d)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
   guides(colour = "none")
 
 report(fit4d)
 sum(fc4d$.mean)
 
 
-
 ```
+
+
 
 Outliers
 
@@ -353,12 +782,12 @@ tsATM4b <- tsATM4a %>%
   dplyr::summarize(MonthlyCash=sum(Cash)) %>%
   as_tsibble(index="Month")
 
-autoplot(tsATM4a)
-autoplot(tsATM4b)
+forecast::autoplot(tsATM4a)
+forecast::autoplot(tsATM4b)
 
   stl<- tsATM4a %>%
   stl(s.window ="periodic")
-  autoplot(stl)
+  forecast::autoplot(stl)
 
 ```
 
@@ -375,7 +804,7 @@ fc4m <- fit4m %>%
   forecast(h = 3)
 
 fc4m %>%
-  autoplot(tsATM4b) +
+  forecast::autoplot(tsATM4b) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit4m)) +
   labs(y="Count", title="ATM1 - ETS AAN") +
@@ -395,7 +824,7 @@ fc4d <- fit4d %>%
   forecast(h = 31)
 
 fc4d %>%
-  autoplot(tsATM4a) +
+  forecast::autoplot(tsATM4a) +
   geom_line(aes(y = .fitted), col="#D55E00",
             data = augment(fit1d)) +
   labs(y="Count", title="ATM1 - ETS AAN") +
@@ -407,5 +836,4 @@ sum(fc4d$.mean)
 
 
 ```
-
 

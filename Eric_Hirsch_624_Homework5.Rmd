@@ -1,7 +1,7 @@
 ---
 title: "Eric_Hirsch_624_Homework_5"
 output: html_document
-date: "2023-02-24"
+date: "2023-03-044"
 ---
 
 ```{r setup, include=FALSE}
@@ -25,6 +25,7 @@ __*8.1 Consider the the number of pigs slaughtered in Victoria, available in the
 
 __*8.1a Use the ETS() function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of α and ℓ, and generate forecasts for the next four months.*__
 
+The values are .325 and 96141.
 
 ```{r}
 
@@ -53,7 +54,7 @@ q[1]
 
 __*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
 
-We can see from the report that the mean is 95183 and the variance is 87367846, thus the sd is the sqrt of the variance = 9347.  The confidence interval is mean +- 1.96*sqrt(sd) = (76863, 113503). 
+We can see from the report above that the mean is 95183 and the variance is 87367846, thus the sd is the sqrt of the variance = 9347.  The confidence interval is mean +- 1.96*sqrt(sd) = (76863, 113503). 
 
 The interval matches that calculated by R.
 
@@ -70,8 +71,7 @@ __*8.5 Data set global_economy contains the annual Exports from many countries. 
 
 __*8.5a Plot the Exports series and discuss the main features of the data.*__
 
-
-The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
+I have chosen the US.  The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
 
 ```{r}
 
@@ -107,44 +107,20 @@ fc %>%
 
 __*8.5c Compute the RMSE values for the training data.*__
 
-The question suggests we need to split the dataset into training and test, so we do that and compute the RMSE value.  The RMSE is 1.232.
+The training RMSE is .627.
 
 
 ```{r}
+fit %>% accuracy()
 
-
-USA_train <- dfUSA %>%
-  filter(Year <= 2010)
-
-USA_fit <- USA_train %>%
-  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
-  
-USA_fc <- USA_fit %>%
-  forecast(h = 4)
-
-accuracy(USA_fc, dfUSA)
-
-#-----------------------------
-
-train2 <- dfUSA %>%
-  filter(Year <= 2010) %>%
-  dplyr::select(Exports)
-
-test2 <- dfUSA %>%
-  filter(Year > 2010) %>%
-  dplyr::select(Exports)
-
-USA_fit2 <- HoltWinters(train2$Exports, gamma = FALSE)
-
-#USA_fit <- model(ETS(train ~ error("A") + trend("N") + season("N")))
-  
-nfuture2 <- forecast::forecast(USA_fit2, h = 12)
 
 ```
 
 __*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
 
-The AAN model accounts for the trend, which matches almost exactly a line form first to last datapoint (the green line).  The ANN model recognizes the cycling up and down of the data and in the short term is probably better because the data is in a down cycle.  AAN better accounts for the overall trend, which is up.
+The RMSE is slightly lower at .615.
+
+The AAN model accounts for the trend, which matches almost exactly a line from first to last data point (the green line).  The ANN model recognizes the cycling up and down of the data and in the short term is probably better because the data is in a down cycle.  AAN better accounts for the overall trend, which is up.
 
 ```{r}
 
@@ -154,7 +130,7 @@ fit_AAN <- dfUSA %>%
 fc_AAN <- fit_AAN %>%
   forecast(h = 10)
 
-rp <- report(fit)
+rp <- report(fit_AAN)
 
 fc_AAN %>%
   autoplot(dfUSA) +
@@ -165,14 +141,14 @@ fc_AAN %>%
   geom_segment(aes(x=1960, xend=2016, y=4.8, yend = 11.9),
                colour = "green")
 
-
+fit_AAN %>% accuracy()
 
 
 ```
 
 __*8.5e Compare the forecasts from both methods. Which do you think is best?*__
 
-It depends on the business case.  Since the data exhibits significant cycling with an inconsistent period, it may be better for very short term business cases (like hiring for next summer) to ignore the trend ad perorm ANN (in fact, the overall trend is up but the current trend is down).  For a longer perspective (say building facilities) I would be more inclined to trust the trend (AAN).
+It depends on the business case.  Since the data exhibits significant cycling with an inconsistent period, it may be better for very short term business cases (like hiring for next summer) to ignore the trend and perform ANN (note, e.g, that the overall trend is up but the current trend is down).  For a longer perspective (say building facilities) I would be more inclined to trust the trend (AAN).
 
 __*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
 
@@ -348,56 +324,55 @@ b2
 
 __*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
 
-The RMSE for the undamped trend is lower.  I see no reason to prefer the damped trend.
+They are very similar (1.3913 vs 1.3955). The RMSE for the undamped trend is lower.  I see no reason to prefer the damped trend.
+
 ```{r}
 
-ms_train <- myseries %>%
-  filter(year(Month) <= 2010)
-
-ms_fit <- ms_train %>%
-  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-  
-ms_fc <- ms_fit %>%
-  forecast(h = 1)
-
-accuracy(ms_fc, myseries)
-
-ms_fit2 <- ms_train %>%
-    model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
-  
-ms_fc2 <- ms_fit2 %>%
-  forecast(h = 1)
-
-accuracy(ms_fc2, myseries)
+fit1 %>% accuracy()
+fit2 %>% accuracy()
 ```
 
 
 __*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
 
-The residuals do not show any particular patterning.  The RMSE for the ETS model is .57, which is lower than the Naive model (7.0) by more than a factor of 10.
+The residuals do not show any particular patterning.  The RMSE for the ETS model is 5, which is lower than the Naive model (7.0).
 
 ```{r}
+
+fit1 %>% gg_tsresiduals()
+
+ms_train <- myseries %>%
+  filter(year(Month)<=2010)
+ms_test <- myseries %>%
+  filter(year(Month)>2010)
 
 fit_SNAIVE <- ms_train %>%
   model(SNAIVE())
 
 fc_SNAIVE <- fit_SNAIVE %>%
-  forecast(new_data = anti_join(myseries, ms_train))
+  forecast(ms_test)
 
+fit_ETS <- ms_train %>%
+  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
 
-accuracy(ms_fc, myseries)
-accuracy(fc_SNAIVE, myseries)
+fc_ETS <- fit_ETS %>%
+  forecast(ms_test)
+
+fc_SNAIVE %>% accuracy(ms_test)
+fc_ETS %>% accuracy(ms_test)
 
 ```
 
 
 __*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
 
-The RMSE for the seasonalally adjusted data is 1.55 - between the other two.  It is not lower, and therefore we reject it.
+The RMSE for the seasonally adjusted data is 1.55 - higher than the other two.  It is not lower, and therefore we reject it.
 
 ```{r}
 
 set.seed(042760)
+
+library(ggplot2)
 
   lambda <- myseries %>%
   features(Turnover, features = guerrero) %>%
@@ -408,17 +383,14 @@ set.seed(042760)
 
   stl<- myseries_boxcox %>%
   stl(s.window ="periodic")
-
-autoplot(stl) +
-  labs(title =
-    "Decomposition of turnover in Australian retail employment using STL.")
+  forecast::autoplot(stl)
 
 tsTrend <- as.data.frame(stl$time.series) %>%
   cbind(myseries) %>%
   as_tsibble(index=Month) %>%
   dplyr::select(Month, trend)
 
-autoplot(tsTrend)
+forecast::autoplot(tsTrend)
 
   ms_trainBC <- tsTrend %>%
   filter(year(Month) <= 2010)
@@ -433,7 +405,7 @@ fc_BC_Test <- fit_BC %>%
   forecast(new_data = anti_join(tsTrend, ms_trainBC))
 
 #accuracy(fit_BC, myseries)
-accuracy(fc_BC_Test, tsTrend)
+accuracy(fc_BC_Test, ms_testBC)
 
 
 ```
