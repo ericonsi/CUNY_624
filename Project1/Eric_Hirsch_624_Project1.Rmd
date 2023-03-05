@@ -380,7 +380,7 @@ fc4 %>%
   labs(y="Count", title="ATM4 - ETS AAA") +
   guides(colour = "none")
 
-report(fit4d)
+report(fit4)
 sum(fc4$.mean)
 
 
