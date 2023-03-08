@@ -78,8 +78,7 @@ I have chosen the US.  The data has a general trend up, with occasional reversal
 dfUSA <- global_economy %>%
   filter(Country=="United States", Year<2017) 
 
-autoplot(dfUSA, Exports) + labs(title = "USA Exports")
-
+autoplot(dfUSA, Exports)
 
 ```
 
