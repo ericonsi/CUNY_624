@@ -1,7 +1,7 @@
 ---
-title: "Eric_Hirsch_624_Homework_5"
+title: "Eric_Hirsch_624_Homework_6"
 output: html_document
-date: "2023-03-044"
+date: "2023-3-12"
 ---
 
 ```{r setup, include=FALSE}
@@ -19,272 +19,148 @@ library(fable)
 
 ```
 
-8.1, 8.5, 8.6, 8.7, 8.8, 8.9
+1,2,3,5,6,7,8
 
-__*8.1 Consider the the number of pigs slaughtered in Victoria, available in the aus_livestock dataset.*__
+__*9.1 Figure 9.32 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.*__
 
-__*8.1a Use the ETS() function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of α and ℓ, and generate forecasts for the next four months.*__
+__9.1a Explain the differences among these figures. Do they all indicate that the data are white noise?*__
 
-The values are .325 and 96141.
+Yes, there is no patterning and no correlations exceed .05.
 
-```{r}
+__*9.1b Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?.*__
 
-dfPigs <- aus_livestock %>%
-  filter(Animal=="Pigs", State=="Victoria") %>%
-  filter_index("1973 Jan" ~ "2018 Dec")
+They are constructed from different sample sizes. The larger the sample, the more "white noise" the sample will be.
 
-fit <- dfPigs %>%
-  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+__*9.2 A classic example of a non-stationary series are stock prices. Plot the daily closing prices for Amazon stock (contained in gafa_stock), along with the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.*__
 
-fcx <- fit %>%
-  forecast(h = 4)
-
-fcx %>%
-  autoplot(dfPigs) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Count", title="Pigs Slaughtered") +
-  guides(colour = "none")
-
-
-report(fit)
-q <- fcx$.mean
-q[1]
-```
-
-__*8.1b Compute a 95% prediction interval for the first forecast. Compare your interval with the interval produced by R.*__
-
-We can see from the report above that the mean is 95183 and the variance is 87367846, thus the sd is the sqrt of the variance = 9347.  The confidence interval is mean +- 1.96*sqrt(sd) = (76863, 113503). 
-
-The interval matches that calculated by R.
-
+The plot of the time series shows a clear trend upward.  The ACF shows an extreme level of autocorrelation.  The PACF shows the extreme degree to which each observation is correlated with the previous one.
 
 ```{r}
 
-hl <- fcx %>%  hilo()
-hl$`95%`[1]
+tsAmazon <- gafa_stock %>%
+  filter(Symbol=="AMZN") 
+
+  autoplot(tsAmazon) + labs(title = "AMZN Closing Price")
+
+  
+tsAmazon |> ACF(Close) %>% autoplot() + labs(title="AMZN Closing Price")
+tsAmazon |> PACF(Close) %>% autoplot() + labs(title="AMZN Closing Price")
 
 ```
 
 
-__*8.5 Data set global_economy contains the annual Exports from many countries. Select one country to analyse.*__
+__*9.3 For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.*__
 
-__*8.5a Plot the Exports series and discuss the main features of the data.*__
+__* 9.3a Turkish GDP from global_economy.*__
 
-I have chosen the US.  The data has a general trend up, with occasional reversals of the trend.  It is possible the downward reversals represent a cycle, but the cycle is irregular.
-
-```{r}
-
-dfUSA <- global_economy %>%
-  filter(Country=="United States", Year<2017) 
-
-autoplot(dfUSA, Exports)
-
-```
-
-
-__*8.5b Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.*__
+The boxcox transformation is not necessary to smooth the variance, but does make the curve more linear.  One difference is all that is necessary to create a stationary series.
 
 ```{r}
 
-fit <- dfUSA %>%
-  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+Get_lambda <- function(ts, column) {
+  lambda <- ts %>%
+  features(ts[,column], features = guerrero) %>%
+  pull(lambda_guerrero)
 
-fc <- fit %>%
-  forecast(h = 10)
+  return(lambda)
 
-rp <- report(fit)
-
-fc %>%
-  autoplot(dfUSA) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title="US Exports") +
-  guides(colour = "none")
-
-
-```
-
-__*8.5c Compute the RMSE values for the training data.*__
-
-The training RMSE is .627.
-
-
-```{r}
-fit %>% accuracy()
-
-
-```
-
-__*8.5d Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.*__
-
-The RMSE is slightly lower at .615.
-
-The AAN model accounts for the trend, which matches almost exactly a line from first to last data point (the green line).  The ANN model recognizes the cycling up and down of the data and in the short term is probably better because the data is in a down cycle.  AAN better accounts for the overall trend, which is up.
-
-```{r}
-
-fit_AAN <- dfUSA %>%
-  model(ETS(Exports ~ error("A") + trend("A") + season("N")))
-
-fc_AAN <- fit_AAN %>%
-  forecast(h = 10)
-
-rp <- report(fit_AAN)
-
-fc_AAN %>%
-  autoplot(dfUSA) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title="US Exports") +
-  guides(colour = "none") +
-  geom_segment(aes(x=1960, xend=2016, y=4.8, yend = 11.9),
-               colour = "green")
-
-fit_AAN %>% accuracy()
-
-
-```
-
-__*8.5e Compare the forecasts from both methods. Which do you think is best?*__
-
-It depends on the business case.  Since the data exhibits significant cycling with an inconsistent period, it may be better for very short term business cases (like hiring for next summer) to ignore the trend and perform ANN (note, e.g, that the overall trend is up but the current trend is down).  For a longer perspective (say building facilities) I would be more inclined to trust the trend (AAN).
-
-__*8.5f Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.*__
-
-ANN: Mean = 11.891, sd = .63834, ci = (10.64, 13.14).
-
-AAN: Mean = 12.001, sd = .63849, ci = (10.75, 13.25)
-The intervals match those of R. They are very similar - however, it is telling that the parameter that accounts for trend has a slightly larger CI.
-
-
-```{r}
-report(fit)
-q <- fc$.mean
-q[1]
-
-report(fit_AAN)
-q1 <- fc_AAN$.mean
-q1[1]
-
-h2 <- fc %>%  hilo()
-h2$`95%`[1]
-
-h3 <- fc_AAN %>%  hilo()
-h3$`95%`[1]
-
-```
-
-__*8,6 Forecast the Chinese GDP from the global_economy data set using an ETS model. Experiment with the various options in the ETS() function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts. *__
-
-Dampening the trend flattens out the prediction.  The lower the phi, the more dampening.  Boxcox changes the confidence intervals.
-
-```{r}
-library(MASS)
-dfC <- global_economy %>%
-  filter(Country=="China")
-
-z <- autoplot(dfC) + labs(title = "China GDP - No forecast")
-
-
-report_fit <- function(df, fit, xtitle="") {
-fc <- fit %>%
-  forecast(h = 25)
-
-#rp <- report(fit)
-
-q <- fc %>%
-  autoplot(df) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit)) +
-  labs(y="Exports", title=paste(xtitle)) +
-  guides(colour = "none") 
-
-return(q)
 }
 
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("N") + season("N")))
-a <- report_fit(dfC, fit, "China GDP - ANN")
+tsTurk <- global_economy %>%
+  filter(Country=="Turkey")
 
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("A") + season("N")))
-b <- report_fit(dfC, fit, "China GDP - AAN")
+tsTurk <- tsTurk |>  mutate(GDP=box_cox(GDP, Get_lambda(tsTurk, "GDP")))
 
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("Ad", phi=.95) + season("N")))
-c <- report_fit(dfC, fit, "China GDP - AAdN .95")
+  tsTurk %>% autoplot(GDP)+ labs(title="Turkey GDP")
+  tsTurk |> ACF(GDP) %>% autoplot() + labs(title="Turkey GDP")
+  tsTurk |> PACF(GDP) %>% autoplot() + labs(title="Turkey GDP")
+  
+  tsTurk |>
+  mutate(diff_GDP = difference(GDP)) |>
+  features(diff_GDP, ljung_box, lag = 10)
 
-fit <- dfC %>%
-  model(ETS(GDP ~ error("A") + trend("Ad", phi=.8) + season("N")))
-d <- report_fit(dfC, fit, "China GDP - AAdN .8")
+  tsTurk |> ACF(difference(GDP)) |>
+  autoplot() + labs(subtitle = "Changes in Turkey GDP")
 
-lambda <- dfC %>%
-  features(GDP, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-fit <- dfC %>%
-  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("A") + season("N")))
-e <- report_fit(dfC, fit, "China GDP - AAN, boxcox")
-
-fit <- dfC %>%
-  model(ETS(box_cox(GDP, lambda) ~ error("A") + trend("Ad", phi=.95) + season("N")))
-f <- report_fit(dfC, fit, "China GDP - AAdN .95, boxcox")
-
-z
-
-library(gridExtra)
-grid.arrange(a,b,c,d,e,f, ncol=2)
-
+  tsTurk |> PACF(difference(GDP)) |>
+  autoplot() + labs(subtitle = "Changes in Turkey GDP")
+  
+  tsTurk |>
+  mutate(diff_GDP = difference(GDP)) |>
+  features(diff_GDP, ljung_box, lag = 10)
+  
 ```
 
-
-__*8.7 Find an ETS model for the Gas data from aus_production and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?*__
-
-Variance in seasonality is increasing over time, so a multiplicative seasonal estimate is needed. The additive model appears better, but this is because the confidence intervals don't account for the heteroskedasticity. Boxcox improves the model as well.
-
+__*9.3b Accommodation takings in the state of Tasmania from aus_accommodation.*__
 
 ```{r}
 
-dfGas <- aus_production %>%
-  dplyr::select(Gas)
-autoplot(dfGas) + labs(title="Gas Production")
+tsAcc <- aus_accommodation %>%
+  filter(State=="Tasmania") 
 
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("A") + trend("A") + season("A")))
-a1 <- report_fit(dfGas, fit, "AAA")
+tsAcc <- tsAcc |>  mutate(Takings=box_cox(Takings, Get_lambda(tsAcc, "Takings")))
 
+  tsAcc %>% autoplot(Takings)+ labs(title="Tasmania Takings")
+  tsAcc |> ACF(Takings) %>% autoplot() + labs(title="Tasmania Takings")
+  tsAcc |> PACF(Takings) %>% autoplot() + labs(title="Tasmania Takings")
 
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("M") + trend("A") + season("M")))
-b1 <- report_fit(dfGas, fit, "MAM")
+  tsAcc |> ACF(difference(Takings)) |>
+  autoplot() + labs(subtitle = "Changes in Tasmania Takings")
 
-lambdaG <- dfGas %>%
-  features(Gas, features = guerrero) %>%
-  pull(lambda_guerrero)
+  tsAcc |> PACF(difference(Takings)) |>
+  autoplot() + labs(subtitle = "Changes in Tasmania Takings")
+  
+  tsAcc |>
+  mutate(diff_Takings = difference(Takings)) |>
+  features(diff_Takings, ljung_box, lag = 10)
+  
+  tsAcc |> ACF(difference(difference(Takings, 4), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Tasmania Takings")
 
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("A") + trend("A") + season("A")))
-c1 <- report_fit(dfGas, fit, "AAA, boxcox")
+  tsAcc |> PACF(difference(difference(Takings, 4), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Tasmania Takings")
+  
+  tsAcc |>
+  mutate(diff_Takings = difference(difference(Takings, 4), 1)) |>
+  features(diff_Takings, ljung_box, lag = 10)
 
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("A") + season("M")))
-d1 <- report_fit(dfGas, fit, "MAM, boxcox")
-
-fit <- dfGas %>%
-  model(ETS(Gas ~ error("M") + trend("Ad", phi=.8) + season("M")))
-e1 <- report_fit(dfGas, fit, "MAdM, phi=.8")
-
-fit <- dfGas %>%
-  model(ETS(box_cox(Gas, lambdaG) ~ error("M") + trend("Ad", phi=.8) + season("M")))
-f1 <- report_fit(dfGas, fit, "MAdM, boxcox, phi=.8")
-
-grid.arrange(a1,b1,c1,d1,e1,f1, ncol=2)
 ```
 
-__*8.8a Recall your retail time series data (from Exercise 8 in Section 2.10).  Why is multiplicative seasonality necessary for this series?*__
+__*9.3c Monthly sales from souvenirs.*__
 
-It appears that seasonality has increasing variance, which suggests the need for a multiplicative model.  Interestingly, an x11 decomposition does not bear this out, as variance appears to wane again toward the end of the series.
+```{r}
+
+tsSouvenirs <- souvenirs %>%
+  mutate(Sales=box_cox(Sales, Get_lambda(souvenirs, "Sales")))
+
+  tsSouvenirs %>% autoplot(Sales)+ labs(title="Souvenir Sales")
+  tsSouvenirs |> ACF(Sales) %>% autoplot() + labs(title="Souvenir Sales")
+  tsSouvenirs |> PACF(Sales) %>% autoplot() + labs(title="Souvenir Sales")
+
+  tsSouvenirs |> ACF(difference(Sales)) |>
+  autoplot() + labs(subtitle = "Changes in Souvenir Sales")
+
+  tsSouvenirs |> PACF(difference(Sales)) |>
+  autoplot() + labs(subtitle = "Changes in Souvenir Sales")
+  
+  tsSouvenirs |>
+  mutate(diff_Sales = difference(Sales)) |>
+  features(diff_Sales, ljung_box, lag = 10)
+  
+  tsSouvenirs |> ACF(difference(difference(Sales, 12), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Souvenir Sales")
+
+  tsSouvenirs |> PACF(difference(difference(Sales, 12), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Souvenir Sales")
+  
+  tsSouvenirs |>
+  mutate(diff_Sales = difference(Sales, 12)) |>
+  features(diff_Sales, ljung_box, lag = 10)
+
+
+```
+
+__*9.5 For your retail data (from Exercise 8 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.*__
 
 ```{r}
 
@@ -292,121 +168,212 @@ set.seed(042760)
 myseries <- aus_retail %>%
   filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
   fill_gaps() %>%
-  dplyr::select(Turnover) 
+  dplyr::select(Turnover)
 
-myseries %>% autoplot() +labs(title="Australian Retail")
+myseries <- myseries %>%
+  mutate(Turnover=box_cox(Turnover, Get_lambda(myseries, "Turnover")))
 
-x11_dcmp <- myseries %>%
-  model(x11 = X_13ARIMA_SEATS(Turnover ~ x11())) %>%
-  components()
-autoplot(x11_dcmp) +
-  labs(title =
-    "Decomposition of turnover in Australian retail employment using X-11.")
-
-```
-
-__*8.8b Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.*__
-
-The damped tend lowers the seasonal cycle, particularly the second one.
-
-```{r}
-
-fit1 <- myseries %>%
-  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-a2 <- report_fit(myseries, fit1, "Australian Retail - MAM")
-a2
-
-fit2 <- myseries %>%
-  model(ETS(Turnover ~ error("M") + trend("Ad", phi=.85) + season("M")))
-b2 <- report_fit(myseries, fit2, "Australian Retail - MAdM, phi=.85")
-b2
-```
-
-__*8.8c Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?*__
-
-They are very similar (1.3913 vs 1.3955). The RMSE for the undamped trend is lower.  I see no reason to prefer the damped trend.
-
-```{r}
-
-fit1 %>% accuracy()
-fit2 %>% accuracy()
-```
-
-
-__*8.8d Check that the residuals from the best method look like white noise. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?*__
-
-The residuals do not show any particular patterning.  The RMSE for the ETS model is 5, which is lower than the Naive model (7.0).
-
-```{r}
-
-fit1 %>% gg_tsresiduals()
-
-ms_train <- myseries %>%
-  filter(year(Month)<=2010)
-ms_test <- myseries %>%
-  filter(year(Month)>2010)
-
-fit_SNAIVE <- ms_train %>%
-  model(SNAIVE())
-
-fc_SNAIVE <- fit_SNAIVE %>%
-  forecast(ms_test)
-
-fit_ETS <- ms_train %>%
-  model(ETS(Turnover ~ error("M") + trend("A") + season("M")))
-
-fc_ETS <- fit_ETS %>%
-  forecast(ms_test)
-
-fc_SNAIVE %>% accuracy(ms_test)
-fc_ETS %>% accuracy(ms_test)
-
-```
-
-
-__*8.9 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?*__
-
-The RMSE for the seasonally adjusted data is 1.55 - higher than the other two.  It is not lower, and therefore we reject it.
-
-```{r}
-
-set.seed(042760)
-
-library(ggplot2)
-
-  lambda <- myseries %>%
-  features(Turnover, features = guerrero) %>%
-  pull(lambda_guerrero)
-
-  myseries_boxcox <- myseries %>% 
-  mutate(Turnover=box_cox(Turnover, lambda))
-
-  stl<- myseries_boxcox %>%
-  stl(s.window ="periodic")
-  forecast::autoplot(stl)
-
-tsTrend <- as.data.frame(stl$time.series) %>%
-  cbind(myseries) %>%
-  as_tsibble(index=Month) %>%
-  dplyr::select(Month, trend)
-
-forecast::autoplot(tsTrend)
-
-  ms_trainBC <- tsTrend %>%
-  filter(year(Month) <= 2010)
+  myseries %>% autoplot(Turnover)+ labs(title="turnover")
+  myseries |> ACF(Turnover) %>% autoplot() + labs(title="turnover")
+  myseries |> PACF(Turnover) %>% autoplot() + labs(title="turnover")
   
-  ms_testBC <- tsTrend %>%
-  filter(year(Month) > 2010)
+  forecast::ndiffs(myseries$Turnover)
+
+  myseries |> ACF(difference(Turnover)) |>
+  autoplot() + labs(subtitle = "Changes in turnover")
+
+  myseries |> PACF(difference(Turnover)) |>
+  autoplot() + labs(subtitle = "Changes in turnover")
   
-fit_BC <- ms_trainBC %>%
-  model(ETS(trend ~ error("A") + trend("A") + season("N")))
+  myseries |>
+  mutate(diff_Turnover = difference(Turnover)) |>
+  features(diff_Turnover, ljung_box, lag = 10)
+  
+  myseries |> ACF(difference(difference(Turnover, 6), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in turnover")
 
-fc_BC_Test <- fit_BC %>%
-  forecast(new_data = anti_join(tsTrend, ms_trainBC))
-
-#accuracy(fit_BC, myseries)
-accuracy(fc_BC_Test, ms_testBC)
+  myseries |> PACF(difference(difference(Turnover, 6), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in turnover")
+  
+  myseries |>
+  mutate(diff_Turnover = difference(Turnover, 6)) |>
+  features(diff_Turnover, ljung_box, lag = 10)
 
 
 ```
+__*9.6 Simulate and plot some data from simple ARIMA models.*__
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+```
+
+__*9.6b Produce a time plot for the series. How does the plot change?*__
+
+The plot becomes denser with decreasing levels of phi.
+
+```{r}
+
+autoplot(sim) +labs(title="phi=.6")
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.9*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim) +labs(title="phi=.9")
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.1*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim) +labs(title="phi=.1")
+
+```
+
+__*9.6c Write your own code to generate data from an MA(1) model*__
+
+```{r}
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + 0.6*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6d Produce a time plot for the series. How does the plot change?*__
+
+The plot becomes denser with decreasing levels of phi.
+
+```{r}
+
+autoplot(sim2) +labs(title="phi=.6")
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .9*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim2) +labs(title="phi=.9")
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .1*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim2) +labs(title="phi=.1")
+
+```
+
+__*9.6e Generate data from an ARMA(1,1) model.__*
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .6*e[i-1] + 0.6*y[i-1]
+sim3 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6f Generate data from an AR(2) model.*__
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 3:100)
+  y[i] <- e[i] -.8*y[i-1] + .3*y[i-2]
+sim4 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6g Graph the latter two series and compare them.*__
+
+```{r}
+
+autoplot(sim3) + labs(title="ARMA")
+autoplot(sim4) + labs(title="AR(2)")
+```
+
+__*9.7 Consider aus_airpassengers, the total number of passengers (in millions) from Australian air carriers for the period 1970-2011.*__
+
+__9.7a Use ARIMA() to find an appropriate ARIMA model. What model was selected. Check that the residuals look like white noise. Plot forecasts for the next 10 periods.*__
+
+```{r}
+
+fit <- aus_airpassengers %>%
+  model(ARIMA(Passengers))
+
+report(fit)
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
+
+```
+
+__*9.7b Write the model in terms of the backshift operator.__*
+
+__*9.7c Plot forecasts from an ARIMA(0,1,0) model with drift and compare these to part a.*__
+
+```{r}
+
+fit2 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(0,1,0)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 0-1-0")) 
+
+```
+
+__*9.7d Plot forecasts from an ARIMA(2,1,2) model with drift and compare these to parts a and c. Remove the constant and see what happens.*__
+
+```{r}
+fit2 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(2,1,2)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2")) 
+
+
+fit3 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(2,1,2)))
+
+report(fit3)
+
+fit3 %>% gg_tsresiduals()
+
+fc3 <- fit3 %>%
+  forecast(h=10)
+
+fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
+
+
+```
+
 
