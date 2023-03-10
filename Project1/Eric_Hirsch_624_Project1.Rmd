@@ -170,7 +170,7 @@ test1 <- tsATM1a %>%
 set.seed(042760)
 
 forecast::autoplot(tsATM1a, Cash) +
-  autolayer(train1, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
+  autolayer(test1, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
 
 
 ```
@@ -178,11 +178,15 @@ forecast::autoplot(tsATM1a, Cash) +
 SNAIVE
 
 Test RMSE = 49
+NAIVE = 40
 
 ```{r}
 
 fit <- train1 %>%
-  model(SNAIVE())
+  model(NAIVE())
+
+#fit <- train1 %>%
+  #model(NAIVE())
 
 fit %>% gg_tsresiduals()
 
@@ -263,6 +267,9 @@ tsATM1a_boxcox <- tsATM1a %>%
 train1_boxcox <- tsATM1a %>%
   filter_index(~ "2010-01-31")
 
+test1_boxcox <- test1 %>%
+    mutate(Cash=box_cox(Cash, lambda))
+
 fit <- train1_boxcox %>%
   model(ETS(Cash ~ error("A") + trend("A") + season("N")))
 
@@ -302,6 +309,104 @@ sum(fc1d$.mean)
 
 ```
 
+Arima
+boxcox 79.8
+Regular 49
+diff 1: 
+diff 2: 
+
+
+```{r}
+
+lambda <- tsATM1a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM1a_boxcox <- tsATM1a %>% 
+  mutate(Cash=box_cox(Cash, lambda))
+
+  train1 |> ACF(Cash) %>% autoplot() + labs(title="Cash")
+  train1 |> PACF(Cash) %>% autoplot() + labs(title="Cash")
+  
+  train2 <- train1 |>
+  mutate(diff_Cash2 = difference(difference(Cash, 7),1), diff_Cash = difference(Cash,7)) 
+  
+  tsATM1c <-   tsATM1a |>
+  mutate(diff_Cash2 = difference(difference(Cash, 7),1), diff_Cash = difference(Cash,7)) 
+  
+  test2 <-   test1 |>
+  mutate(diff_Cash2 = difference(difference(Cash, 7),1), diff_Cash = difference(Cash,7)) 
+    
+  train2 |> ACF(diff_Cash) %>% autoplot() + labs(title="Cash")
+  train2 |> PACF(diff_Cash) %>% autoplot() + labs(title="Cash")
+
+fit_Arim <- train2 |>
+    model(ARIMA(Cash))
+
+report(fit_Arim)
+
+fit_Arim %>% gg_tsresiduals()
+
+fc <- fit_Arim %>%
+  forecast(new_data = test1, h=31)
+fc %>% forecast::autoplot(tsATM1c) + labs(title = "ATM1, Training Data is < January") 
+
+fit_Arim %>% accuracy()
+fc %>% accuracy(test2)
+#1,0,0 2,0,0 [7]
+
+```
+
+Using ARIMA for the forecast
+2401 for May
+
+```{r}
+
+
+fit1d <- tsATM1c %>%
+    model(ARIMA(Cash ~ 0 + pdq(2,0,0) + PDQ(0,1,1)))  
+  
+fc1d <- fit1d %>%
+  forecast(h = 31)
+
+fc1d %>%
+  forecast::autoplot(tsATM1c) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit1d)
+sum(fc1d$.mean)
+
+
+```
+SNAIVE forecast
+2408
+
+```{r}
+
+fit1d <- tsATM1 %>%
+    model(SNAIVE(Cash))
+  
+fc1d <- fit1d %>%
+  forecast(h = 31)
+
+fc1d %>%
+  forecast::autoplot(tsATM1) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit1d)) +
+  labs(y="Count", title="ATM1 - SNaive") +
+  guides(colour = "none")
+
+report(fit1d)
+sum(fc1d$.mean)
+
+```
+
+
+
+Model4
 
 Outliers
 
@@ -376,7 +481,7 @@ fc4 <- fit4 %>%
 fc4 %>%
   forecast::autoplot(tsATM4a) +
   geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit1d)) +
+            data = augment(fit4)) +
   labs(y="Count", title="ATM4 - ETS AAA") +
   guides(colour = "none")
 
@@ -398,7 +503,7 @@ test4 <- tsATM4a %>%
 set.seed(042760)
 
 forecast::autoplot(tsATM4a, Cash) +
-  autolayer(train1, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
+  autolayer(test4, Cash, colour = "red") + labs(title = "ATM1, Training Data is < January") 
 
 
 ```
@@ -505,8 +610,61 @@ fc4 %>% accuracy(test4)
 
 ```
 
+ARIMA
+RMSE 309.96
+
+Boxcox
+RMSE 313.4
+
+
+```{r}
+
+
+  train4 |> ACF(Cash) %>% autoplot() + labs(title="Cash")
+  train4 |> PACF(Cash) %>% autoplot() + labs(title="Cash")
+
+fit_Arim <- train4 |>
+    model(ARIMA(Cash))
+
+report(fit_Arim)
+
+fit_Arim %>% gg_tsresiduals()
+
+fc <- fit_Arim %>%
+  forecast(new_data = test4, h=31)
+fc %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit_Arim %>% accuracy()
+fc %>% accuracy(test4)
+#1,0,0 2,0,0 [7]
+
+lambda <- tsATM4a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+fit_Arim <- train4 |>
+    model(ARIMA(box_cox(Cash, lambda)))
+
+report(fit_Arim)
+
+fit_Arim %>% gg_tsresiduals()
+
+fc <- fit_Arim %>%
+  forecast(new_data = test4, h=31)
+fc %>% forecast::autoplot(tsATM4a) + labs(title = "ATM4, Training Data is < January") 
+
+fit_Arim %>% accuracy()
+fc %>% accuracy(test4)
+
+
+
+
+
+```
+
+
 Apply best model to test data
-2470 for May
+AAN - 2470 for May
 
 
 
@@ -529,6 +687,31 @@ sum(fc4d$.mean)
 
 
 ```
+
+Forecast ARIMA
+Sum: 3181
+
+```{r}
+
+fit4d <- tsATM4a %>%
+      model(ARIMA(Cash ~ 0 + pdq(0,0,0) + PDQ(1,0,0)))  
+  
+fc4d <- fit4d %>%
+  forecast(h = 31)
+
+fc4d %>%
+  forecast::autoplot(tsATM4a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4d)) +
+  labs(y="Count", title="ATM4 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4d$.mean)
+
+```
+
+
 
 Outliers
 
@@ -618,7 +801,7 @@ test2 <- tsATM2a %>%
 set.seed(042760)
 
 forecast::autoplot(tsATM2a, Cash) +
-  autolayer(train2, Cash, colour = "red") + labs(title = "ATM2, Training Data is < January") 
+  autolayer(test2, Cash, colour = "red") + labs(title = "ATM2, Training Data is < January") 
 
 
 ```
@@ -726,10 +909,6 @@ fc4 %>% accuracy(test4)
 
 ```
 
-Apply best model to test data
-2470 for May
-
-
 
 ```{r}
 fit4d <- tsATM4a %>%
@@ -751,6 +930,54 @@ sum(fc4d$.mean)
 
 ```
 
+ARIMA
+RMSE 56 (Boxcox)
+RMSE 60 (Regular)
+```{r}
+
+
+  train2 |> ACF(Cash) %>% autoplot() + labs(title="Cash")
+  train2 |> PACF(Cash) %>% autoplot() + labs(title="Cash")
+
+fit_Arim <- train2 |>
+    model(ARIMA(Cash))
+
+report(fit_Arim)
+
+fit_Arim %>% gg_tsresiduals()
+
+fc <- fit_Arim %>%
+  forecast(new_data = test2, h=31)
+fc %>% forecast::autoplot(tsATM4a) + labs(title = "ATM2, Training Data is < January") 
+
+fit_Arim %>% accuracy()
+fc %>% accuracy(test2)
+#1,0,0 2,0,0 [7]
+
+lambda <- tsATM2a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+fit_Arim <- train2 |>
+    model(ARIMA(box_cox(Cash, lambda)))
+
+report(fit_Arim)
+
+fit_Arim %>% gg_tsresiduals()
+
+fc <- fit_Arim %>%
+  forecast(new_data = test2, h=31)
+fc %>% forecast::autoplot(tsATM2a) + labs(title = "ATM2, Training Data is < January") 
+
+fit_Arim %>% accuracy()
+fc %>% accuracy(test2)
+
+
+
+
+
+```
+```
 
 
 Outliers

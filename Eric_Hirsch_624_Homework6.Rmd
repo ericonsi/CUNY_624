@@ -321,7 +321,7 @@ fit %>% gg_tsresiduals()
 fc <- fit %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
+fc %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
 
 ```
 
