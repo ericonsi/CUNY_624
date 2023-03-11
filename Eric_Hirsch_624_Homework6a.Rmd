@@ -1,0 +1,379 @@
+---
+title: "Eric_Hirsch_624_Homework_6"
+output: html_document
+date: "2023-3-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibble)
+library(fpp3)
+library(EHData)
+library(gridExtra)
+library(fable)
+
+```
+
+1,2,3,5,6,7,8
+
+__*9.1 Figure 9.32 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.*__
+
+__9.1a Explain the differences among these figures. Do they all indicate that the data are white noise?*__
+
+Yes, there is no patterning and no correlations exceed .05.
+
+__*9.1b Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?.*__
+
+They are constructed from different sample sizes. The larger the sample, the more "white noise" the sample will be.
+
+__*9.2 A classic example of a non-stationary series are stock prices. Plot the daily closing prices for Amazon stock (contained in gafa_stock), along with the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.*__
+
+The plot of the time series shows a clear trend upward.  The ACF shows an extreme level of autocorrelation.  The PACF shows the extreme degree to which each observation is correlated with the previous one.
+
+```{r}
+
+tsAmazon <- gafa_stock %>%
+  filter(Symbol=="AMZN") 
+
+  autoplot(tsAmazon) + labs(title = "AMZN Closing Price")
+
+  
+tsAmazon |> ACF(Close) %>% autoplot() + labs(title="AMZN Closing Price")
+tsAmazon |> PACF(Close) %>% autoplot() + labs(title="AMZN Closing Price")
+
+```
+
+
+__*9.3 For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.*__
+
+__* 9.3a Turkish GDP from global_economy.*__
+
+The boxcox transformation is not necessary to smooth the variance, but does make the curve more linear.  One difference is all that is necessary to create a stationary series.
+
+```{r}
+
+Get_lambda <- function(ts, column) {
+  lambda <- ts %>%
+  features(ts[,column], features = guerrero) %>%
+  pull(lambda_guerrero)
+
+  return(lambda)
+
+}
+
+tsTurk <- global_economy %>%
+  filter(Country=="Turkey")
+
+tsTurk <- tsTurk |>  mutate(GDP=box_cox(GDP, Get_lambda(tsTurk, "GDP")))
+
+  tsTurk %>% autoplot(GDP)+ labs(title="Turkey GDP")
+  tsTurk |> ACF(GDP) %>% autoplot() + labs(title="Turkey GDP")
+  tsTurk |> PACF(GDP) %>% autoplot() + labs(title="Turkey GDP")
+  
+  tsTurk |>
+  mutate(diff_GDP = difference(GDP)) |>
+  features(diff_GDP, ljung_box, lag = 10)
+
+  tsTurk |> ACF(difference(GDP)) |>
+  autoplot() + labs(subtitle = "Changes in Turkey GDP")
+
+  tsTurk |> PACF(difference(GDP)) |>
+  autoplot() + labs(subtitle = "Changes in Turkey GDP")
+  
+  tsTurk |>
+  mutate(diff_GDP = difference(GDP)) |>
+  features(diff_GDP, ljung_box, lag = 10)
+  
+```
+
+__*9.3b Accommodation takings in the state of Tasmania from aus_accommodation.*__
+
+```{r}
+
+tsAcc <- aus_accommodation %>%
+  filter(State=="Tasmania") 
+
+tsAcc <- tsAcc |>  mutate(Takings=box_cox(Takings, Get_lambda(tsAcc, "Takings")))
+
+  tsAcc %>% autoplot(Takings)+ labs(title="Tasmania Takings")
+  tsAcc |> ACF(Takings) %>% autoplot() + labs(title="Tasmania Takings")
+  tsAcc |> PACF(Takings) %>% autoplot() + labs(title="Tasmania Takings")
+
+  tsAcc |> ACF(difference(Takings)) |>
+  autoplot() + labs(subtitle = "Changes in Tasmania Takings")
+
+  tsAcc |> PACF(difference(Takings)) |>
+  autoplot() + labs(subtitle = "Changes in Tasmania Takings")
+  
+  tsAcc |>
+  mutate(diff_Takings = difference(Takings)) |>
+  features(diff_Takings, ljung_box, lag = 10)
+  
+  tsAcc |> ACF(difference(difference(Takings, 4), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Tasmania Takings")
+
+  tsAcc |> PACF(difference(difference(Takings, 4), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Tasmania Takings")
+  
+  tsAcc |>
+  mutate(diff_Takings = difference(difference(Takings, 4), 1)) |>
+  features(diff_Takings, ljung_box, lag = 10)
+
+```
+
+__*9.3c Monthly sales from souvenirs.*__
+
+```{r}
+
+tsSouvenirs <- souvenirs %>%
+  mutate(Sales=box_cox(Sales, Get_lambda(souvenirs, "Sales")))
+
+  tsSouvenirs %>% autoplot(Sales)+ labs(title="Souvenir Sales")
+  tsSouvenirs |> ACF(Sales) %>% autoplot() + labs(title="Souvenir Sales")
+  tsSouvenirs |> PACF(Sales) %>% autoplot() + labs(title="Souvenir Sales")
+
+  tsSouvenirs |> ACF(difference(Sales)) |>
+  autoplot() + labs(subtitle = "Changes in Souvenir Sales")
+
+  tsSouvenirs |> PACF(difference(Sales)) |>
+  autoplot() + labs(subtitle = "Changes in Souvenir Sales")
+  
+  tsSouvenirs |>
+  mutate(diff_Sales = difference(Sales)) |>
+  features(diff_Sales, ljung_box, lag = 10)
+  
+  tsSouvenirs |> ACF(difference(difference(Sales, 12), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Souvenir Sales")
+
+  tsSouvenirs |> PACF(difference(difference(Sales, 12), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in Souvenir Sales")
+  
+  tsSouvenirs |>
+  mutate(diff_Sales = difference(Sales, 12)) |>
+  features(diff_Sales, ljung_box, lag = 10)
+
+
+```
+
+__*9.5 For your retail data (from Exercise 8 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.*__
+
+```{r}
+
+set.seed(042760)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1)) %>%
+  fill_gaps() %>%
+  dplyr::select(Turnover)
+
+myseries <- myseries %>%
+  mutate(Turnover=box_cox(Turnover, Get_lambda(myseries, "Turnover")))
+
+  myseries %>% autoplot(Turnover)+ labs(title="turnover")
+  myseries |> ACF(Turnover) %>% autoplot() + labs(title="turnover")
+  myseries |> PACF(Turnover) %>% autoplot() + labs(title="turnover")
+  
+  forecast::ndiffs(myseries$Turnover)
+
+  myseries |> ACF(difference(Turnover)) |>
+  autoplot() + labs(subtitle = "Changes in turnover")
+
+  myseries |> PACF(difference(Turnover)) |>
+  autoplot() + labs(subtitle = "Changes in turnover")
+  
+  myseries |>
+  mutate(diff_Turnover = difference(Turnover)) |>
+  features(diff_Turnover, ljung_box, lag = 10)
+  
+  myseries |> ACF(difference(difference(Turnover, 6), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in turnover")
+
+  myseries |> PACF(difference(difference(Turnover, 6), 1)) |>
+  autoplot() + labs(subtitle = "Changes*2 in turnover")
+  
+  myseries |>
+  mutate(diff_Turnover = difference(Turnover, 6)) |>
+  features(diff_Turnover, ljung_box, lag = 10)
+
+
+```
+__*9.6 Simulate and plot some data from simple ARIMA models.*__
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+```
+
+__*9.6b Produce a time plot for the series. How does the plot change?*__
+
+The plot becomes denser with decreasing levels of phi.
+
+```{r}
+
+autoplot(sim) +labs(title="phi=.6")
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.9*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim) +labs(title="phi=.9")
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.1*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim) +labs(title="phi=.1")
+
+```
+
+__*9.6c Write your own code to generate data from an MA(1) model*__
+
+```{r}
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + 0.6*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6d Produce a time plot for the series. How does the plot change?*__
+
+The plot becomes denser with decreasing levels of phi.
+
+```{r}
+
+autoplot(sim2) +labs(title="phi=.6")
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .9*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim2) +labs(title="phi=.9")
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .1*e[i-1]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+autoplot(sim2) +labs(title="phi=.1")
+
+```
+
+__*9.6e Generate data from an ARMA(1,1) model.__*
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- e[i] + .6*e[i-1] + 0.6*y[i-1]
+sim3 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6f Generate data from an AR(2) model.*__
+
+```{r}
+
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 3:100)
+  y[i] <- e[i] -.8*y[i-1] + .3*y[i-2]
+sim4 <- tsibble(idx = seq_len(100), y = y, index = idx)
+
+```
+
+__*9.6g Graph the latter two series and compare them.*__
+
+```{r}
+
+autoplot(sim3) + labs(title="ARMA")
+autoplot(sim4) + labs(title="AR(2)")
+```
+
+__*9.7 Consider aus_airpassengers, the total number of passengers (in millions) from Australian air carriers for the period 1970-2011.*__
+
+__9.7a Use ARIMA() to find an appropriate ARIMA model. What model was selected. Check that the residuals look like white noise. Plot forecasts for the next 10 periods.*__
+
+```{r}
+
+fit <- aus_airpassengers %>%
+  model(ARIMA(Passengers))
+
+report(fit)
+
+fit %>% gg_tsresiduals()
+
+fc <- fit %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
+
+```
+
+__*9.7b Write the model in terms of the backshift operator.__*
+
+__*9.7c Plot forecasts from an ARIMA(0,1,0) model with drift and compare these to part a.*__
+
+```{r}
+
+fit2 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(0,1,0)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 0-1-0")) 
+
+```
+
+__*9.7d Plot forecasts from an ARIMA(2,1,2) model with drift and compare these to parts a and c. Remove the constant and see what happens.*__
+
+```{r}
+fit2 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(2,1,2)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2")) 
+
+
+fit3 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(2,1,2)))
+
+report(fit3)
+
+fit3 %>% gg_tsresiduals()
+
+fc3 <- fit3 %>%
+  forecast(h=10)
+
+fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
+
+
+```
+
+
