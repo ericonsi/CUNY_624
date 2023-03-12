@@ -341,7 +341,7 @@ fit2 %>% gg_tsresiduals()
 fc2 <- fit2 %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 0-1-0")) 
+#fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 0-1-0")) 
 
 ```
 
@@ -353,12 +353,12 @@ fit2 <- aus_airpassengers %>%
 
 report(fit2)
 
-fit2 %>% gg_tsresiduals()
+#fit2 %>% gg_tsresiduals()
 
 fc2 <- fit2 %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2")) 
+#fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2")) 
 
 
 fit3 <- aus_airpassengers %>%
@@ -366,12 +366,12 @@ fit3 <- aus_airpassengers %>%
 
 report(fit3)
 
-fit3 %>% gg_tsresiduals()
+#fit3 %>% gg_tsresiduals()
 
 fc3 <- fit3 %>%
   forecast(h=10)
 
-fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
+#fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
 
 
 ```
