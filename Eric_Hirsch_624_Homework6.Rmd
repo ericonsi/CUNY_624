@@ -1,11 +1,13 @@
 ---
 title: "Eric_Hirsch_624_Homework_6"
-output: html_document
-date: "2023-3-12"
+
+output:
+  html_document:
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
@@ -341,7 +343,7 @@ fit2 %>% gg_tsresiduals()
 fc2 <- fit2 %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 0-1-0")) 
+fc2 %>% autoplot(aus_airpassengers) + labs(labs(title = "ARIMA 0-1-0")) 
 
 ```
 
@@ -349,7 +351,56 @@ __*9.7d Plot forecasts from an ARIMA(2,1,2) model with drift and compare these t
 
 ```{r}
 fit2 <- aus_airpassengers %>%
+  model(ARIMA(Passengers ~ pdq(2,1,2), include.mean=FALSE))
+
+report(fit2)
+
+#fit2 %>% gg_tsresiduals()
+
+#fc2 <- fit2 %>%
+#  forecast(h=10)
+
+#fc2 %>% autoplot(aus_airpassengers) + labs(labs(title = "ARIMA 0-1-0")) 
+
+
+fit3 <- aus_airpassengers %>%
   model(ARIMA(Passengers ~ pdq(2,1,2)))
+
+report(fit3)
+
+#fit3 %>% gg_tsresiduals()
+
+#fc3 <- fit3 %>%
+#  forecast(h=10)
+
+#fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
+
+
+```
+
+
+Plot forecasts from an ARIMA(0,2,1) model with a constant. What happens?
+
+For the United States GDP series (from global_economy):
+
+a.if necessary, find a suitable Box-Cox transformation for the data;
+
+```{r}
+
+tsUSA <- global_economy %>%
+  filter(Country=="United States")
+
+tsUSA <- tsUSA |>  mutate(GDP=box_cox(GDP, Get_lambda(tsUSA, "GDP")))
+
+```
+
+b, fit a suitable ARIMA model to the transformed data using ARIMA();
+
+AIC 657
+
+```{r}
+fit2 <- tsUSA %>%
+  model(ARIMA(GDP))
 
 report(fit2)
 
@@ -358,22 +409,64 @@ fit2 %>% gg_tsresiduals()
 fc2 <- fit2 %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2")) 
-
-
-fit3 <- aus_airpassengers %>%
-  model(ARIMA(Passengers ~ pdq(2,1,2)))
-
-report(fit3)
-
-fit3 %>% gg_tsresiduals()
-
-fc3 <- fit3 %>%
-  forecast(h=10)
-
-fc3 %>% autoplot(aus_airpassengers) + labs(title = + labs(title = "ARIMA 2-1-2, no drift")) 
+fc2 %>% autoplot(tsUSA) + labs(labs(title = "ARIMA 1-1-0")) 
 
 
 ```
 
+c. try some other plausible models by experimenting with the orders chosen:
+
+1-1-1, 1-2-0 <- 659, 656
+
+```{r}
+
+fit2 <- tsUSA %>%
+  model(ARIMA(GDP ~ pdq(1,1,1)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(tsUSA) + labs(labs(title = "ARIMA 1-1-1")) 
+
+fit2 <- tsUSA %>%
+  model(ARIMA(GDP ~ pdq(1,2,0)))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(tsUSA) + labs(labs(title = "ARIMA 1-2-0")) 
+
+```
+
+d. choose what you think is the best model and check the residual diagnostics;
+e. produce forecasts of your fitted model. Do the forecasts look reasonable?
+
+f. compare the results with what you would obtain using ETS() (with no transformation).
+
+```{r}
+
+tsU<- global_economy %>%
+  filter(Country=="United States")
+
+
+fit2 <- tsU  %>% model(ETS(GDP ~ error("M") + trend("A") + season("N")))
+
+report(fit2)
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(h=10)
+
+fc2 %>% autoplot(tsU) + labs(labs(title = "ETS MAN")) 
+
+```
 
