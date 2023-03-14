@@ -1,0 +1,207 @@
+---
+title: "Eric_Hirsch_624_Homework_5"
+output: html_document
+date: "2023-02-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibble)
+library(fpp3)
+library(EHData)
+library(gridExtra)
+library(fable)
+library(readxl)
+
+```
+
+1. First we read in the data and look for missing values.  
+
+There are 19 records with missing values in the dataset, including 14 with a missing ATM (they all represent days from the month of May 2010, which is what we are predicting.)  This leaves 5 missing cash values - we use ARIMA to impute them.
+
+Then we separate the original tsibble into 4 tsibbles, each representing one ATM.
+
+```{r}
+
+dfATM <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project1\\ATM624Data.xlsx"))
+
+summary(dfATM)
+str(dfATM)
+
+print("Missing ATM: ")
+which(is.na(dfATM$ATM))
+print("Missing Cash: ")
+which(is.na(dfATM$Cash))
+
+CreateAtmTsibble <- function(filter) {
+  
+  ts <- dfATM %>%
+  filter(ATM==filter)%>%
+  mutate(xDate=as_date(DATE)) %>%
+  as_tsibble(index=xDate) %>%
+  dplyr::select(xDate, Cash)
+  
+  ts <- ts %>%
+  model(ARIMA(Cash)) %>%
+  interpolate(ts)
+  
+  return (ts)
+}
+
+tsATM1a <- CreateAtmTsibble("ATM1")
+tsATM2a <- CreateAtmTsibble("ATM2")
+tsATM3 <- CreateAtmTsibble("ATM3")
+tsATM4 <- CreateAtmTsibble("ATM4")
+
+lambda <- tsATM1a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+#tsATM1a <- tsATM1a %>%
+ # mutate(Cash=box_cox(Cash, lambda))
+
+```
+
+2. Examine ATM1
+
+First we look a the data. It shows a number of strange patterns, not the least of which is that the money removed from the ATMs is not in multiples of twenty.  Also, the distribution is bimodal.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
+
+We will train the model on 75% of the data.
+
+## Results {.tabset}
+
+### ATM1
+
+```{r, fig.height=2}
+
+Summarize_ATM <- function(ts, ATM) {
+dfCash1 <- as.data.frame(ts$Cash)
+a <- EHSummarize_SingleColumn_Boxplots(dfCash1)
+b <- EHSummarize_SingleColumn_Histograms(dfCash1)
+
+grid.arrange(grobs=c(a,b), ncol=2)
+
+train1 <- ts %>%
+  filter_index(~ "2010-01-31")
+
+test1 <- ts %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+c <- forecast::autoplot(ts, Cash) +
+  autolayer(test1, Cash, colour = "red") + labs(title = paste(ATM, ", Training Data is <= January")) 
+print(c)
+
+x <- list(train1, test1)
+return(x)
+}
+
+
+```
+
+3. Forecast ATM1
+
+b. Now we try different models.
+
+```{r}
+
+Train_ATM <- function(train1){
+fit <- train1 %>%
+  model(SNAIVE = SNAIVE(), ETS_AAN = ETS(Cash ~ error("A") + trend("A") + season("N")), ETS_AAA = ETS(Cash ~ error("A") + trend("A") + season("A")), ETS_AAdA = ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")), ARIMA=ARIMA(Cash))
+
+return(fit)
+}
+
+```
+
+```{r, include=FALSE}
+
+Examine_Residuals <- function(fit) {
+
+resids <- function(model) {
+a <- fit[model] %>% gg_tsresiduals + labs(title=model)
+return (a)
+}
+
+z <- list()
+plot_list <- list()
+
+for (i in names(fit)) {
+  index=1
+  
+  x <- resids(i)
+  p <- eval(substitute(x, list(i=index)))
+  plot_list[[i]] <- p 
+  
+  index=index+1
+}
+return (plot_list)
+}
+
+
+```
+
+```{r, fig.height=9}
+Print_Residuals <- function(plot_list){
+grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_AAN[1:3], plot_list$ETS_AAA[1:3], plot_list$ETS_AAdA[1:3], plot_list$ARIMA[1:3]), ncol=3)
+}
+```
+
+```{r, fig.height=4}
+Check_RMSE <- function(fit, test1, ts, ATM){
+fc <- fit %>%
+  forecast(test1)
+
+a <- fc %>% forecast::autoplot(ts) + labs(title = paste(ATM, ", Training Data is <= January"))
+
+b <- fit %>% accuracy()
+c <- fc %>% accuracy(test1)
+
+ww <- list(a,b,c)
+
+}
+```
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM1a, "ATM1")
+```
+```{r}
+fit <- Train_ATM(train[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fit)
+```
+```{r, fig.height=9}
+Print_Residuals(pp)
+```
+```{r, fig.height=4}
+ww <- Check_RMSE(fit, train[[2]], tsATM1a, "ATM1")
+plot(ww[[1]])
+ww[[3]]
+```
+
+### ATM2
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM2a, "ATM2")
+```
+```{r}
+fit <- Train_ATM(train[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fit)
+```
+```{r, fig.height=9}
+Print_Residuals(pp)
+```
+```{r, fig.height=4}
+ww <- Check_RMSE(fit, train[[2]], tsATM2a, "ATM2")
+plot(ww[[1]])
+ww[[3]]
+```

@@ -73,13 +73,25 @@ First we look a the data. It shows a number of strange patterns, not the least o
 
 ```{r, fig.height=2}
 
-dfCash1 <- as.data.frame(tsATM1a$Cash)
+Summarize_ATM <- function(ts, ATM) {
+dfCash1 <- as.data.frame(ts$Cash)
 a <- EHSummarize_SingleColumn_Boxplots(dfCash1)
 b <- EHSummarize_SingleColumn_Histograms(dfCash1)
 
 grid.arrange(grobs=c(a,b), ncol=2)
-c
 
+train1 <- ts %>%
+  filter_index(~ "2010-01-31")
+
+test1 <- ts %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+forecast::autoplot(ts, Cash) +
+  autolayer(test1, Cash, colour = "red") + labs(title = paste(ATM, ", Training Data is <= January")) 
+
+}
 
 ```
 
@@ -89,16 +101,17 @@ a. We will train the model on 75% of the data.
 
 ```{r, fig.height=2}
 
-train1 <- tsATM1a %>%
+Train_ATM <- function(ts)
+train1 <- ts %>%
   filter_index(~ "2010-01-31")
 
-test1 <- tsATM1a %>%
+test1 <- ts %>%
   filter_index("2010-02-1" ~ .)
 
 set.seed(042760)
 
-forecast::autoplot(tsATM1a, Cash) +
-  autolayer(test1, Cash, colour = "red") + labs(title = "ATM1, Training Data is <= January") 
+forecast::autoplot(ts, Cash) +
+  autolayer(test1, Cash, colour = "red") + labs(title = paste(ATM1, " Training Data is <= January"))
 
 
 ```
@@ -231,6 +244,142 @@ sum(fc1d$.mean)
 ```
 
 
+
+Outliers
+
+```{r, fig.height=2}
+
+dfCash1 <- as.data.frame(tsATM1a$Cash)
+a <- EHSummarize_SingleColumn_Boxplots(dfCash1)
+b <- EHSummarize_SingleColumn_Histograms(dfCash1)
+
+grid.arrange(grobs=c(a,b), ncol=2)
+
+
+```
+```
+
+
+
+
+```{r}
+
+train2m <- tsATM2b %>%
+  filter_index(~ "2010 Feb")
+
+fit2m <- tsATM2b %>%
+  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
+  
+fc2m <- fit2m %>%
+  forecast(h = 3)
+
+fc2m %>%
+  forecast::autoplot(tsATM2b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit2m)) +
+  labs(y="Count", title="ATM1 - ETS AAN") +
+  guides(colour = "none")
+
+report(fit2m)
+fc2m$.mean
+
+```
+do it a daily
+
+```{r}
+fit2d <- tsATM2a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+  
+fc2d <- fit2d %>%
+  forecast(h = 31)
+
+fc2d %>%
+  forecast::autoplot(tsATM2a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit2d)) +
+  labs(y="Count", title="ATM2 - ETS AAA") +
+  guides(colour = "none")
+
+report(fit2d)
+sum(fc2d$.mean)
+
+
+
+```
+
+Test  Models 2
+
+```{r}
+train2 <- tsATM2a %>%
+  filter_index(~ "2010-01-31")
+
+test2 <- tsATM2a %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+forecast::autoplot(tsATM2a, Cash) +
+  autolayer(test2, Cash, colour = "red") + labs(title = "ATM2, Training Data is < January") 
+
+
+```
+
+SNAIVE
+
+Test RMSE = 58.58
+
+```{r}
+
+fit2 <- train2 %>%
+  model(SNAIVE())
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM4a, train4))
+
+fc2 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM2, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
+ETS AAN 
+
+RMSE 39.43
+
+```{r}
+
+fit2 <- train2 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM2a, train2))
+fc %>% forecast::autoplot(tsATM2a) + labs(title = "ATM2, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
+
+ETS AAA
+
+RMSE 59.28
+
+```{r}
+
+fit2 <- train2 %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
+
+fit2 %>% gg_tsresiduals()
+
+fc2 <- fit2 %>%
+  forecast(new_data = anti_join(tsATM2a, train2))
+fc2 %>% forecast::autoplot(tsATM2a) + labs(title = "ATM4, Training Data is < January") 
+
+fit2 %>% accuracy()
+fc2 %>% accuracy(test2)
+```
 
 Model4
 
@@ -371,156 +520,6 @@ sum(fc4d$.mean)
 ```
 
 
-
-Outliers
-
-```{r}
-
-summary(tsATM2a)
-dfCash2 <- as.data.frame(tsATM2a$Cash)
-EHSummarize_SingleColumn_Boxplots(dfCash2)
-EHSummarize_SingleColumn_Histograms(dfCash2)
-
-
-```
-
-Turn to monthly
-```{r}
-  
-tsATM2b <- tsATM2a %>%
-  as.data.frame() %>%
-  group_by(Month=yearmonth(xDate)) %>%
-  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
-  as_tsibble(index="Month")
-
-forecast::autoplot(tsATM2a)
-forecast::autoplot(tsATM2b)
-
-  stl<- tsATM2a %>%
-  stl(s.window ="periodic")
-  forecast::autoplot(stl)
-
-```
-
-
-```{r}
-
-train2m <- tsATM2b %>%
-  filter_index(~ "2010 Feb")
-
-fit2m <- tsATM2b %>%
-  model(ETS(MonthlyCash ~ error("A") + trend("A") + season("N")))
-  
-fc2m <- fit2m %>%
-  forecast(h = 3)
-
-fc2m %>%
-  forecast::autoplot(tsATM2b) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit2m)) +
-  labs(y="Count", title="ATM1 - ETS AAN") +
-  guides(colour = "none")
-
-report(fit2m)
-fc2m$.mean
-
-```
-do it a daily
-
-```{r}
-fit2d <- tsATM2a %>%
-  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
-  
-fc2d <- fit2d %>%
-  forecast(h = 31)
-
-fc2d %>%
-  forecast::autoplot(tsATM2a) +
-  geom_line(aes(y = .fitted), col="#D55E00",
-            data = augment(fit2d)) +
-  labs(y="Count", title="ATM2 - ETS AAA") +
-  guides(colour = "none")
-
-report(fit2d)
-sum(fc2d$.mean)
-
-
-
-```
-
-Test  Models 2
-
-```{r}
-train2 <- tsATM2a %>%
-  filter_index(~ "2010-01-31")
-
-test2 <- tsATM2a %>%
-  filter_index("2010-02-1" ~ .)
-
-set.seed(042760)
-
-forecast::autoplot(tsATM2a, Cash) +
-  autolayer(test2, Cash, colour = "red") + labs(title = "ATM2, Training Data is < January") 
-
-
-```
-
-SNAIVE
-
-Test RMSE = 58.58
-
-```{r}
-
-fit2 <- train2 %>%
-  model(SNAIVE())
-
-fit2 %>% gg_tsresiduals()
-
-fc2 <- fit2 %>%
-  forecast(new_data = anti_join(tsATM4a, train4))
-
-fc2 %>% forecast::autoplot(tsATM4a) + labs(title = "ATM2, Training Data is < January") 
-
-fit2 %>% accuracy()
-fc2 %>% accuracy(test2)
-```
-ETS AAN 
-
-RMSE 39.43
-
-```{r}
-
-fit2 <- train2 %>%
-  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
-
-fit2 %>% gg_tsresiduals()
-
-fc2 <- fit2 %>%
-  forecast(new_data = anti_join(tsATM2a, train2))
-fc %>% forecast::autoplot(tsATM2a) + labs(title = "ATM2, Training Data is < January") 
-
-fit2 %>% accuracy()
-fc2 %>% accuracy(test2)
-```
-
-ETS AAA
-
-RMSE 59.28
-
-```{r}
-
-fit2 <- train2 %>%
-  model(ETS(Cash ~ error("A") + trend("A") + season("A")))
-
-fit2 %>% gg_tsresiduals()
-
-fc2 <- fit2 %>%
-  forecast(new_data = anti_join(tsATM2a, train2))
-fc2 %>% forecast::autoplot(tsATM2a) + labs(title = "ATM4, Training Data is < January") 
-
-fit2 %>% accuracy()
-fc2 %>% accuracy(test2)
-```
 ETS AAdA (.85)
 
 RMSE 373.92

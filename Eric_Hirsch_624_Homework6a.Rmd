@@ -93,6 +93,9 @@ tsTurk <- tsTurk |>  mutate(GDP=box_cox(GDP, Get_lambda(tsTurk, "GDP")))
 
 __*9.3b Accommodation takings in the state of Tasmania from aus_accommodation.*__
 
+Two differences are necessary - including a seasonal 4 month difference.
+
+
 ```{r}
 
 tsAcc <- aus_accommodation %>%
@@ -128,6 +131,8 @@ tsAcc <- tsAcc |>  mutate(Takings=box_cox(Takings, Get_lambda(tsAcc, "Takings"))
 
 __*9.3c Monthly sales from souvenirs.*__
 
+Again, two differences are needed, including a yearly lag.
+
 ```{r}
 
 tsSouvenirs <- souvenirs %>%
@@ -162,6 +167,8 @@ tsSouvenirs <- souvenirs %>%
 
 __*9.5 For your retail data (from Exercise 8 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.*__
 
+
+
 ```{r}
 
 set.seed(042760)
@@ -189,14 +196,14 @@ myseries <- myseries %>%
   mutate(diff_Turnover = difference(Turnover)) |>
   features(diff_Turnover, ljung_box, lag = 10)
   
-  myseries |> ACF(difference(difference(Turnover, 6), 1)) |>
+  myseries |> ACF(difference(difference(Turnover, 12), 1)) |>
   autoplot() + labs(subtitle = "Changes*2 in turnover")
 
-  myseries |> PACF(difference(difference(Turnover, 6), 1)) |>
+  myseries |> PACF(difference(difference(Turnover, 12), 1)) |>
   autoplot() + labs(subtitle = "Changes*2 in turnover")
   
   myseries |>
-  mutate(diff_Turnover = difference(Turnover, 6)) |>
+  mutate(diff_Turnover = difference(Turnover, 12)) |>
   features(diff_Turnover, ljung_box, lag = 10)
 
 
@@ -321,7 +328,7 @@ fit %>% gg_tsresiduals()
 fc <- fit %>%
   forecast(h=10)
 
-fc2 %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
+fc %>% autoplot(aus_airpassengers) + labs(title = "ARIMA 0-2-1")
 
 ```
 
