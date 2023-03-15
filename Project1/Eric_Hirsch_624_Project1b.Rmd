@@ -331,24 +331,26 @@ forecast::autoplot(tsATM2c)
 
 1. Examine the data.
 
-ATM3 has three values for April and nothing else. It is tempting to simply take the mean of those three values and apply them to May. While that might suffice for April's estimate, I am going to go out on a limb and suggest that 
+ATM3 has three values for April and nothing else. We could:
+
+1. Start with an average from April and apply it to the 31 days of May.
+2. Test statistically whether all four ATMs are connected and use this to modify our forecast (e.g. increase the forecast because May of last year is always larger than April of this year.)  
+3. Check to see whether the April dates are pulled from the weekend or weekdays and apply some kind of seasonal adjustment.
+
+But the fruits of this effort are likely to be very small. There is just not enough data.  So for this exercise we will simply apply the daily average of April over the 31 days of May.  This yields $2,717.67.
 
 ```{r, fig.height=2}
 train <- Summarize_ATM(tsATM3, "ATM3")
 ```
-
 ```{r}
 
+v <- tsATM3 |>
+  filter(Cash>0)
 
-tsATM4c <- tsATM4 %>%
-  as.data.frame() %>%
-  group_by(Month=yearmonth(xDate)) %>%
-  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
-  as_tsibble(index="Month")
-
-forecast::autoplot(tsATM4c)
+mean(v$Cash)*31
 
 ```
+
 
 
 
