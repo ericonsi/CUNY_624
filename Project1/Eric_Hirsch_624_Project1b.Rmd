@@ -255,7 +255,7 @@ forecast::autoplot(tsATM1b)
 
 First we look a the data. It shows similar irregularities as ATM1, including the bimodal distribution and cash not in multiples of twenty.  Also, the distribution is bimodal.  There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
 
-We will train the model on 75% of the data.
+2. We will train the model on 75% of the data.
 
 ```{r, fig.height=2}
 train <- Summarize_ATM(tsATM2a, "ATM2")
@@ -379,8 +379,9 @@ tsATM4a <- tsATM4a %>%
 
 ```{r}
 train <- Summarize_ATM(tsATM4a, "ATM4")
+
 ```
-We will train the model on 75% of the data.
+2. We will train using various methods on 75% of the data.
 
 ```{r}
 lambda <- tsATM4a %>%
@@ -450,7 +451,9 @@ forecast::autoplot(tsATM4c)
 
 1. Examine the data.
 
-The data has both a missing value and an outlier.  We use Arima to interpolate both.
+The data has both a missing value and an outlier.  We use Arima to interpolate both.  We might imagine that the outlier is a typo (and then we might just add a 0 to the end) but we have no other evidence to suggest this.
+
+The variance appears to increase over time so we will apply a boxcox transformation.
 
 ```{r}
 
@@ -460,105 +463,73 @@ tsForecast <- dfForecast |>
   rename("Month" = "YYYY-MMM") |>
   mutate(Month=yearmonth(Month)) |>
   as_tsibble(index=Month)
-  
 
 summary(dfForecast)
 str(tsForecast)
 autoplot(tsForecast, KWH)
 
-```
+tsForecast2 <- tsForecast |>
+  mutate(KWH=ifelse(KWH<800000, NA, KWH))
 
-missing data
-```{r}
-
-InterpolateBetweenRows <- function(df, column, rowNumber) {
-
-lo = rowNumber-1
-hi = rowNumber+1
-
-df1 <- filter(df, row_number() == lo)
-df2 <- filter(df, row_number() == hi)
-x = (df1[,column] + df2[,column])/2
-df[rowNumber, column] = x
-return (df)
-
-
-}
-
-tsForecastTest <- tsForecast %>%
-  dplyr::filter(row_number()>120 & row_number()<140)
-autoplot(tsForecastTest, KWH)
-
-which(is.na(tsForecast$KWH))
-
-tsForecast2 <- InterpolateBetweenRows(tsForecast, "KWH", 129)
-
-tsForecastTest <- tsForecast2 %>%
-  dplyr::filter(row_number()>120 & row_number()<140)
-autoplot(tsForecastTest, KWH)
-
-```
-
-Could do average interpolation, or multiply by 7
-
-
-
-```{r}
-
-boxplot(tsForecast2$KWH)
-min <- tsForecast2 |> dplyr::filter(KWH == 770523)
-
-tsForecastTest2 <- tsForecast2 %>%
-  dplyr::filter(CaseSequence>873 & CaseSequence<893)
-autoplot(tsForecastTest2, KWH)
-
-tsForecast3 <- tsForecast2 |>
-  mutate(KWH = ifelse(CaseSequence==883,7705230,KWH)) 
+  tsForecast3 <- tsForecast2 %>%
+  model(ARIMA(KWH)) %>%
+  interpolate(tsForecast2)
   
-tsForecastTest3 <- tsForecast3 %>%
-  dplyr::filter(CaseSequence>873 & CaseSequence<893)
-autoplot(tsForecastTest3, KWH)
-
-min2 <- InterpolateBetweenRows(tsForecast, "KWH", 11)
-min2[11, "KWH"]
+  autoplot(tsForecast3, KWH)
 
 ```
 
-```{r}
-tsForecast4 <-tsForecast3 %>%
-  dplyr::select(KWH)
-
-  stl<- tsForecast4 %>%
-  stl(s.window ="periodic")
-  forecast::autoplot(stl)
-
-
-```
-
-Test  Models KWH
-
+2. We will train using various methods on 75% of the data.
 
 ```{r}
+set.seed(042760)
 
-tsForecast5 <- tsForecast4 |>
-  mutate(KWH=log(KWH))
-  
+lambda <- tsForecast3 %>%
+  features(KWH, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsForecast5 <- tsForecast3 %>%
+ mutate(KWH=box_cox(KWH, lambda))
+
 train1 <- tsForecast5 %>%
   filter_index(~ "2009 Dec")
 
 test1 <- tsForecast5 %>%
   filter_index("2010 Jan" ~ .)
 
+
+forecast::autoplot(tsForecast5, KWH) +
+  autolayer(test1, KWH, colour = "red") + labs(title = paste("KWH, Training Data is <= 2009 Dec")) 
+
+
+
+
+```
+
+```{r}
+
+fit <- train1 %>%
+  model(ETS(KWH ~ error("N") + trend("M") + season("N")))
+
+report(fit)
+```
+
+
+```{r}
+
 fit <- train1 %>%
   model(SNAIVE = SNAIVE(), ETS_AAN = ETS(KWH ~ error("A") + trend("A") + season("N")), ETS_AAA = ETS(KWH ~ error("A") + trend("A") + season("A")), ETS_AAdA = ETS(KWH ~ error("A") + trend("Ad", phi=.85) + season("A")), ARIMA=ARIMA(KWH))
+
+```
+
+```{r, include=FALSE}
+
+Examine_Residuals <- function(fit) {
 
 resids <- function(model) {
 a <- fit[model] %>% gg_tsresiduals + labs(title=model)
 return (a)
 }
-```
-
-```{r, include=FALSE}
 
 z <- list()
 plot_list <- list()
@@ -572,12 +543,19 @@ for (i in names(fit)) {
   
   index=index+1
 }
+return (plot_list)
+}
+
+
 ```
 
 ```{r, fig.height=9}
 
-grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_AAN[1:3], plot_list$ETS_AAA[1:3], plot_list$ETS_AAdA[1:3], plot_list$ARIMA[1:3]), ncol=3)
+Examine_Residuals(fit)
 
+Print_Residuals <- function(plot_list){
+grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_AAN[1:3], plot_list$ETS_AAA[1:3], plot_list$ETS_AAdA[1:3], plot_list$ARIMA[1:3]), ncol=3)
+}
 ```
 
 ```{r, fig.height=4}
@@ -585,7 +563,9 @@ grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_AAN[1:3], plot_list$ET
 fc <- fit %>%
   forecast(test1)
 
-fc %>% forecast::autoplot(tsForecast5) + labs(title = "KWH") 
+fc %>% forecast::autoplot(ts) + labs(title = paste(ATM, ", Training Data is <= January"))
 
+fit %>% accuracy()
 fc %>% accuracy(test1)
-```
+
+}
