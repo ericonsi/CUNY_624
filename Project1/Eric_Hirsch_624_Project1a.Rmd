@@ -1081,6 +1081,21 @@ autoplot(tsForecast, KWH)
 
 missing data
 ```{r}
+
+InterpolateBetweenRows <- function(df, column, rowNumber) {
+
+lo = rowNumber-1
+hi = rowNumber+1
+
+df1 <- filter(df, row_number() == lo)
+df2 <- filter(df, row_number() == hi)
+x = (df1[,column] + df2[,column])/2
+df[rowNumber, column] = x
+return (df)
+
+
+}
+
 tsForecastTest <- tsForecast %>%
   dplyr::filter(row_number()>120 & row_number()<140)
 autoplot(tsForecastTest, KWH)
