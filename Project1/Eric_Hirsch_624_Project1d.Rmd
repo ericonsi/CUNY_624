@@ -1,0 +1,702 @@
+---
+title: "Eric_Hirsch_624_Project_1"
+output: html_document
+date: "2023-02-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(tsibble)
+library(fpp3)
+library(EHData)
+library(gridExtra)
+library(fable)
+library(readxl)
+
+```
+
+__ATM DATA__
+
+First we read in the data and look for missing values.  
+
+There are 19 records with missing values in the dataset, including 14 with a missing ATM (they all represent days from the month of May 2010, which is what we are predicting.)  This leaves 5 missing cash values - we use ARIMA to impute them.
+
+Then we separate the original tsibble into 4 tsibbles, each representing one ATM.
+
+```{r}
+
+dfATM <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project1\\ATM624Data.xlsx"))
+
+summary(dfATM)
+str(dfATM)
+
+print("Missing ATM: ")
+which(is.na(dfATM$ATM))
+print("Missing Cash: ")
+which(is.na(dfATM$Cash))
+
+CreateAtmTsibble <- function(filter) {
+  
+  ts <- dfATM %>%
+  filter(ATM==filter)%>%
+  mutate(xDate=as_date(DATE)) %>%
+  as_tsibble(index=xDate) %>%
+  dplyr::select(xDate, Cash)
+  
+  ts <- ts %>%
+  model(ARIMA(Cash)) %>%
+  interpolate(ts)
+  
+  return (ts)
+}
+
+tsATM1a <- CreateAtmTsibble("ATM1")
+tsATM2a <- CreateAtmTsibble("ATM2")
+tsATM3 <- CreateAtmTsibble("ATM3")
+tsATM4 <- CreateAtmTsibble("ATM4")
+
+
+```
+
+
+## Forecasts {.tabset}
+
+### ATM1
+
+__1. Examine the data.__
+
+First we look at a boxplot, histogram and decomposition of the data. It shows a number of strange patterns, not the least of which is that the money removed from the ATMs is not in multiples of twenty.  Also, the distribution is bimodal.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
+
+
+```{r, fig.height=2}
+
+Summarize_ATM <- function(ts, ATM) {
+dfCash1 <- as.data.frame(ts$Cash)
+a <- EHSummarize_SingleColumn_Boxplots(dfCash1)
+b <- EHSummarize_SingleColumn_Histograms(dfCash1)
+
+grid.arrange(grobs=c(a,b), ncol=2)
+
+train1 <- ts %>%
+  filter_index(~ "2010-01-31")
+
+test1 <- ts %>%
+  filter_index("2010-02-1" ~ .)
+
+set.seed(042760)
+
+c <- forecast::autoplot(ts, Cash) +
+  autolayer(test1, Cash, colour = "red") + labs(title = paste(ATM, ", Training Data is <= January")) 
+
+
+  stl<- ts %>%
+  stl(s.window ="periodic")
+
+x <- list(train1, test1, stl, c)
+return(x)
+}
+
+
+```
+
+
+```{r}
+
+Train_ATM <- function(train1){
+fit <- train1 %>%
+  model(SNAIVE = SNAIVE(), ETS_AAN = ETS(Cash ~ error("A") + trend("A") + season("N")), ETS_AAA = ETS(Cash ~ error("A") + trend("A") + season("A")), ETS_AAdA = ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")), ARIMA=ARIMA(Cash))
+
+return(fit)
+}
+
+```
+
+```{r, include=FALSE}
+
+Examine_Residuals <- function(fit) {
+
+resids <- function(model) {
+a <- fit[model] %>% gg_tsresiduals + labs(title=model)
+return (a)
+}
+
+z <- list()
+plot_list <- list()
+
+for (i in names(fit)) {
+  index=1
+  
+  x <- resids(i)
+  p <- eval(substitute(x, list(i=index)))
+  plot_list[[i]] <- p 
+  
+  index=index+1
+}
+return (plot_list)
+}
+
+
+```
+
+```{r, fig.height=9}
+Print_Residuals <- function(plot_list){
+grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_AAN[1:3], plot_list$ETS_AAA[1:3], plot_list$ETS_AAdA[1:3], plot_list$ARIMA[1:3]), ncol=3)
+}
+```
+
+```{r, fig.height=4}
+Check_RMSE <- function(fit, test1, ts, ATM){
+fc <- fit %>%
+  forecast(test1)
+
+a <- fc %>% forecast::autoplot(ts) + labs(title = paste(ATM, ", Training Data is <= January"))
+
+b <- fit %>% accuracy()
+c <- fc %>% accuracy(test1)
+
+ww <- list(a,b,c)
+
+}
+```
+
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM1a, "ATM1")
+```
+
+```{r, fig.height = 2}
+
+autoplot(train[[3]]) + labs(title="ATM1 STL Decomposition")
+```
+
+__2. We will train various models on 75% of the data.__
+
+```{r, fig.height=2}
+
+print(train[[4]])
+
+```
+
+```{r}
+fit <- Train_ATM(train[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fit)
+```
+
+a. ATM1 Residuals
+
+```{r, fig.height=9}
+Print_Residuals(pp)
+```
+
+b. Forecasts and test RMSE
+
+```{r, fig.height=4}
+ww <- Check_RMSE(fit, train[[2]], tsATM1a, "ATM1")
+plot(ww[[1]])
+ww[[3]]
+```
+__3. Forecast using the best model.__
+
+Interestingly, the RMSEs are comparable for all models except ETS_AAN (even SNAIVE).  However, the residuals for ETS_AAN indicate a strong issue (because it is not accounting for seasonality) so we don't trust standard errors and other statistical inference calculations.
+
+In this case we decide to compare the results of several modes before deciding what to do.  First we look at total May cash using ARIMA(0-0-3,0-1-1)(7)).  The sum is $2,402.
+
+```{r}
+
+fit4d <- tsATM1a %>%
+  model(ARIMA(Cash ~ pdq(0,0,3) + PDQ(0,1,1)))
+  
+fc4d <- fit4d %>%
+  forecast(h = 31)
+
+fc4d %>%
+  forecast::autoplot(tsATM1a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4d)) +
+  labs(y="Count", title="ATM1 - ARIMA(0-0-3, 0-1-1)(7)") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4d$.mean)
+
+```
+Now we look at total May cash using ETS(AAN).  The sum is $2,465.  There is only a $63 difference despite the lack of a seasonal component in the ATM. We can see from the Monthly cash plot that May's cash haul last year was comparable, so we split the difference - $2,435.
+
+```{r}
+
+fit4d <- tsATM1a %>%
+  model(ETS(Cash ~ error("A") + trend("A") + season("N")))
+  
+fc4d <- fit4d %>%
+  forecast(h = 31)
+
+fc4d %>%
+  forecast::autoplot(tsATM1a) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4d)) +
+  labs(y="Count", title="ATM1 - ETS-AAN") +
+  guides(colour = "none")
+
+report(fit4d)
+sum(fc4d$.mean)
+
+```
+
+```{r}
+
+tsATM1b <- tsATM1a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+forecast::autoplot(tsATM1b) + labs(title="ATM1 Aggregated by Month")
+
+```
+
+
+### ATM2
+
+__1. Examine the data.__
+
+First we look at a boxplot, histogram and decomposition of the data. It shows similar irregularities as ATM1, including the bimodal distribution and cash not in multiples of twenty.    There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
+
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM2a, "ATM2")
+```
+
+```{r, fig.height = 2}
+
+autoplot(train[[3]]) + labs(title="ATM2 STL Decomposition")
+
+print(train[[4]]) 
+```
+
+ATM2 with BoxCox
+
+```{r, fig.height=2}
+lambda <- tsATM2a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM2b <- tsATM2a %>%
+ mutate(Cash=box_cox(Cash, lambda))
+
+train <- Summarize_ATM(tsATM2b, "ATM2 with BoxCox")
+```
+
+
+__2. We will train various models on 75% of the data.__
+
+```{r, fig.height=2}
+
+print(train[[4]])
+
+```
+
+```{r}
+fit <- Train_ATM(train[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fit)
+```
+
+a. ATM2 Residuals
+
+```{r, fig.height=9}
+Print_Residuals(pp)
+```
+
+b. Forecasts and test RMSE
+
+```{r, fig.height=4}
+ww <- Check_RMSE(fit, train[[2]], tsATM2a, "ATM2")
+plot(ww[[1]])
+ww[[3]]
+```
+__3. Forecast using the best model.__
+
+The RMSEs are again comparable for all models - ETS_AAN again performs best but the residuals suggest the standard error may not be accurate. 
+
+We will estimate the cash using ETS_AADA as it had the second lowest RMSE and the residuals indicate white noise.  We will need to reverse the boxcox.
+
+Total cash for May is $1,825. This falls short of last May but probably reflects a significant downward trend after last May.
+
+```{r}
+fit2 <- tsATM2b %>%
+  model(ETS(Cash ~ error("A") + trend("Ad", phi=.85) + season("A")))
+
+fc2 <- fit2 %>%
+  forecast(h = 31)
+
+rr <- as.vector(fc2$.mean)
+rr2 <- forecast::InvBoxCox(rr, lambda)
+
+fc2 %>%
+  forecast::autoplot(tsATM2b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit2)) +
+  labs(y="Count", title="ATM2 - ETS(AAdA), phi=.85") +
+  guides(colour = "none")
+
+report(fit2)
+sum(rr2)
+
+```
+
+
+```{r}
+
+tsATM2c <- tsATM2a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+forecast::autoplot(tsATM2c)+ labs(title="ATM2 Aggregated by Month")
+
+```
+
+
+### ATM3
+
+__1. Examine the data.__
+
+ATM3 has three values for April and nothing else. We could:
+
+1. Start with an average from April and apply it to the 31 days of May.
+2. Test statistically whether all four ATMs are connected and use this to modify our forecast (e.g. increase the forecast because May of last year is always larger than April of this year.)  
+3. Check to see whether the April dates are pulled from the weekend or weekdays and apply some kind of seasonal adjustment.
+
+But the fruits of this effort are likely to be very small. There is just not enough data.  So for this exercise we will simply apply the daily average of April over the 31 days of May.  This yields $2,717.67.
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM3, "ATM3")
+```
+```{r}
+
+v <- tsATM3 |>
+  filter(Cash>0)
+
+mean(v$Cash)*31
+
+```
+
+
+
+
+### ATM 4
+
+__1. Examine the data.__
+
+ATM4 has an extreme outlier which must be rectified. We can use Arima interpolation.
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM4, "ATM4")
+```
+
+After the interpolation there are still some high values for cash, but we keep them since they are merely the tail end of a range of values. The variance looks smaller toward the end of the series so we will employ a boxcox transformation.
+
+```{r}
+
+tsATM4a <- tsATM4  %>%
+  mutate(Cash=ifelse(Cash>10000, NA, Cash))
+
+tsATM4a <- tsATM4a %>%
+  model(ARIMA(Cash)) %>%
+  interpolate(tsATM4a)
+
+
+```
+
+Outlier corrected
+
+```{r, fig.height=2}
+train <- Summarize_ATM(tsATM4a, "ATM4")
+```
+
+```{r, fig.height=2}
+
+autoplot(train[[3]]) + labs(title="ATM4 STL Decomposition")
+
+print(train[[4]]) 
+```
+
+
+ATM4 with BoxCox
+
+```{r, fig.height=2}
+lambda <- tsATM4a %>%
+  features(Cash, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsATM4b <- tsATM4a %>%
+ mutate(Cash=box_cox(Cash, lambda))
+
+train <- Summarize_ATM(tsATM4b, "ATM4 with BoxCox")
+print(train[[4]]) 
+```
+
+```{r}
+fit <- Train_ATM(train[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fit)
+```
+
+__a. ATM4 Residuals__
+
+```{r, fig.height=9}
+Print_Residuals(pp)
+```
+
+__b. Forecasts and test RMSE__
+
+```{r, fig.height=4}
+ww <- Check_RMSE(fit, train[[2]], tsATM4b, "ATM4")
+plot(ww[[1]])
+ww[[3]]
+```
+
+__3. Forecast using the best model.__
+
+ARIMA performs the "best" - comparable to the lowest RMSE (ETS_AAN) with normal looking residuals centered on zero and looking like white noise.  
+
+The model is an (0-0-0), (2-0-0)(7) model, showing how important seasonality is in the estimate. The model estimates $9,931 for May.  This is lower than last May and April and probably reflects the downward trend in the data since January.
+
+```{r}
+fit4 <- tsATM4b %>%
+   model(ARIMA(Cash ~ pdq(0,0,0) + PDQ(2,0,0)))  
+
+fc4 <- fit4 %>%
+  forecast(h = 31)
+
+rr <- as.vector(fc4$.mean)
+rr4 <- forecast::InvBoxCox(rr, lambda)
+
+fc4 %>%
+  forecast::autoplot(tsATM4b) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit4)) +
+  labs(y="Count", title="ATM4 - ARIMA(0-0-0)(2-0-0)(7)") +
+  guides(colour = "none")
+
+report(fit4)
+sum(rr4)
+
+```
+```{r}
+
+
+tsATM4c <- tsATM4a %>%
+  as.data.frame() %>%
+  group_by(Month=yearmonth(xDate)) %>%
+  dplyr::summarize(MonthlyCash=sum(Cash)) %>%
+  as_tsibble(index="Month")
+
+forecast::autoplot(tsATM4c)+ labs(title="ATM4 Aggregated by Month")
+
+
+```
+
+### KWH
+
+__1. Examine the data__
+
+The data has both a missing value and an outlier.  We use Arima to interpolate both.  We might imagine that the outlier is a typo (and then we might just add a 0 to the end) but we have no other evidence to suggest this.
+
+The variance appears to increase over time so we will apply a boxcox transformation.
+
+```{r, fig.height=4}
+
+
+dfForecast <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project1\\ForecastLoad.xlsx"))
+
+tsForecast <- dfForecast |>
+  rename("Month" = "YYYY-MMM") |>
+  mutate(Month=yearmonth(Month)) |>
+  as_tsibble(index=Month)
+
+
+summary(dfForecast)
+str(tsForecast)
+autoplot(tsForecast, KWH)+ labs(title="KWH")
+
+tsForecast2 <- tsForecast |>
+  mutate(KWH=ifelse(KWH<800000, NA, KWH))
+
+  tsForecast3 <- tsForecast2 %>%
+  model(ARIMA(KWH)) %>%
+  interpolate(tsForecast2)
+  
+  autoplot(tsForecast3, KWH) + labs(title="KWH, with outlier removed")
+  
+  lambdaKWH <- tsForecast3 %>%
+  features(KWH, features = guerrero) %>%
+  pull(lambda_guerrero)
+
+tsForecast5 <- tsForecast3 %>%
+ mutate(KWH=box_cox(KWH, lambdaKWH)) %>%
+  dplyr::select(KWH)
+
+```
+
+__2. We will train using various methods on 75% of the data.__
+
+```{r}
+
+set.seed(042760)
+
+Summarize_KWH <- function(ts, ATM) {
+set.seed(042760)
+
+train1 <- tsForecast5 %>%
+  filter_index(~ "2009 Dec")
+
+test1 <- tsForecast5 %>%
+  filter_index("2010 Jan" ~ .)
+
+c <- forecast::autoplot(tsForecast5, KWH) +
+  autolayer(test1, KWH, colour = "red") + labs(title = paste("KWH, Training Data is <= 2009 Dec")) 
+print(c)
+
+x <- list(train1, test1)
+return(x)
+}
+
+```
+
+```{r}
+set.seed(042760)
+Train_KWH <- function(train1){
+fit <- train1 %>%
+  model(SNAIVE = SNAIVE(), ETS_MMN = ETS(KWH ~ error("M") + trend("M") + season("N")), ETS_MMA = ETS(KWH ~ error("M") + trend("M") + season("A")), ETS_MMdA = ETS(KWH ~ error("M") + trend("Md", phi=.85) + season("A")), ARIMA=ARIMA(KWH))
+
+return(fit)
+}
+
+```
+
+```{r, fig.height=4}
+
+set.seed(042760)
+Check_RMSE_KWH <- function(fit, test1, ts){
+fc <- fit %>%
+  forecast(test1)
+
+a <- fc %>% forecast::autoplot(ts) + labs(title = paste("KWH"))
+
+b <- fit %>% accuracy()
+c <- fc %>% accuracy(test1)
+
+ww <- list(a,b,c)
+
+}
+```
+
+
+```{r, fig.height=2}
+trainKWH <- Summarize_KWH(tsForecast5, "KWH")
+```
+
+```{r}
+fitKWH <- Train_KWH(trainKWH[[1]])
+```
+```{r, include=FALSE}
+pp <- Examine_Residuals(fitKWH)
+```
+
+__a. Residual plots for each of the models__
+
+```{r, fig.height=9}
+
+Print_ResidualsKWH <- function(plot_list){
+grid.arrange(grobs=c(plot_list$SNAIVE[1:3], plot_list$ETS_MMN[1:3], plot_list$ETS_MMA[1:3], plot_list$ETS_MMdA[1:3], plot_list$ARIMA[1:3]), ncol=3)
+}
+
+Print_ResidualsKWH(pp)
+```
+
+__b. RMSE and forecasts__
+
+
+```{r, fig.height=4}
+ww <- Check_RMSE_KWH(fitKWH, trainKWH[[2]], tsForecast5)
+plot(ww[[1]])
+ww[[3]]
+```
+
+__3. Forecast using the best model.__
+
+ETS_MMA has the lowest RMSE and the residuals, with a few small exceptions in the acf plot, look like white noise.  However, the ARIMA model also has a low RMSE and more normally distributed residuals, so we'll look at both.
+
+The ETS model estimates 92,882,533 KW for 2014, while the ARIMA model estimates 91,392,876. The difference between them is about 1.5% of the total.  We will split the difference and estimate 92,137,704.5 KWH.
+
+
+```{r}
+fitKWH <- tsForecast5 %>%
+   model(ETS(KWH ~ error("M") + trend("M") + season("A")))
+
+fcKWH <- fitKWH %>%
+  forecast(h = 12)
+
+rr <- as.vector(fcKWH$.mean)
+rrKWH <- forecast::InvBoxCox(rr, lambdaKWH)
+
+fcKWH %>%
+  forecast::autoplot(tsForecast5) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fitKWH)) +
+  labs(y="Count", title="KWH - ES(M-M-A))") +
+  guides(colour = "none")
+
+report(fitKWH)
+sum(rrKWH)
+
+```
+
+
+```{r}
+
+fitKWH <- tsForecast5 %>%
+      model(ARIMA(KWH ~ pdq(1,0,1) + PDQ(0,1,1)))
+
+fcKWH <- fitKWH %>%
+  forecast(h = 12)
+
+rr <- as.vector(fcKWH$.mean)
+rrKWH <- forecast::InvBoxCox(rr, lambdaKWH)
+
+fcKWH %>%
+  forecast::autoplot(tsForecast5) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fitKWH)) +
+  labs(y="Count", title="KWH - ARIMA((1-0-1)(0-1-1)(12)") +
+  guides(colour = "none")
+
+report(fitKWH)
+sum(rrKWH)
+
+```
+
+```{r}
+
+
+tsForecast3c <- tsForecast3 %>%
+  as.data.frame() %>%
+  group_by(Year=year(Month)) %>%
+  dplyr::summarize(Annual_KWH=sum(KWH)) %>%
+  as_tsibble(index="Year")
+
+forecast::autoplot(tsForecast3c)+ labs(title="KWH Aggregated by Year")
+
+
+```
