@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1015368/fd7dfd6876dc4de58edb56fd93a073d2
+bundleId: https://api.rpubs.com/api/v1/document/1015368/fd7dfd6876dc4de58edb56fd93a073d2
+url: http://rpubs.com/ericonsi/1015368
+when: 1679242046.98056
+lastSyncTime: 1679242046.98057

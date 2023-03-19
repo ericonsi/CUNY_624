@@ -1,0 +1,96 @@
+---
+title: "Presentations"
+output: html_document
+date: "2023-03-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(faraway)
+library(EHData)
+library(devtools)
+library(roxygen2)
+library(Hmisc)
+library(psych)
+library(tidyverse)
+library(skimr)
+library(purrr)
+library(tidyr)
+library(gridExtra)
+library(lubridate)
+library(fastDummies)
+library(data.table)
+library(mltools)
+library(MASS)
+library(car)
+library(patchwork)
+library(ggthemes)
+library(tinytex)
+library(stats)
+library(ggsci)
+library(scales)
+library(naniar)
+#library(Amelia)
+library(caret)
+library(pROC)
+
+```
+```{r}
+
+
+dfKanga <- kanga %>%
+  select(-species, -sex)
+summary(dfKanga)
+```
+
+```{r}
+library(caret)
+y <- EHPrepare_MissingValues_Imputation(dfKanga)
+
+x <- EHModel_Regression_StandardLM(y, "mandible.width")
+
+```
+
+```{r}
+
+
+df7a <- EHData::EHPrepare_ScaleAllButTarget(dfTrain6, "SalePrice")
+dfSubmit7a <- as.data.frame(scale(dfTest6))
+
+df7b <- df7a %>%
+    dplyr::select(-SalePrice)
+
+y <- df7a$SalePrice
+x <- data.matrix(df7b)
+xSub <- data.matrix(dfSubmit7a)
+
+model <- glmnet(x, y, alpha = 0)
+```
+
+R makes it easy to find the best lambda by using kfold validation.  Below are the results of our ridge regression analysis. Unlike stepAIC, ridge regression will retain all of the variables. 
+
+```{r}
+
+
+#We find the optimal lambda by performing k-fold cross validation:
+
+mcv <- cv.glmnet(x, y, alpha = 0)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+plot(model, xvar = "lambda")
+
+m10 <- glmnet(x, y, alpha = 0, lambda = lambda1)
+coef(m10)
+
+x2 <- tidy(coef(m10))
+
+y_predicted <- predict(m10, s = lambda1, newx = xSub)
+
+```
+
+
