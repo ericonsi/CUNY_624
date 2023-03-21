@@ -1,0 +1,261 @@
+---
+title: "Eric_Hirsch_624_Homework_7"
+
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(EHData)
+library(gridExtra)
+library(caret)
+library(AppliedPredictiveModeling)
+
+```
+
+6.1, 6.2
+
+```{r}
+
+
+data(permeability)  
+
+dfPermeability <- as.data.frame(permeability)
+dfFingerprints <- as.data.frame(fingerprints)
+
+summary(dfPermeability)
+str(dfPermeability)
+
+```
+
+
+__*6.2b Filter out the predictors that have low frequencies using the nearZeroVar function from the caret package.  How many predictors are left for modeling?*__
+
+From 1107 to 388.
+
+```{r}
+dfFingerprints2 <- dfFingerprints[, -nearZeroVar(dfFingerprints)]
+dfAll <- cbind(dfFingerprints2, dfPermeability)
+
+```
+
+
+__*6.1b Split the data into a training and a test set, pre-process the data, and tune a PLS model. How many latent variables are optimal and what is the corresponding resampled estimate of R2?*__
+
+No missing values
+Much multico
+
+```{r}
+
+a <- EHExplore_Multicollinearity(dfFingerprints2, printHeatMap=FALSE, printHighest = TRUE)
+
+```
+
+
+
+```{r}
+
+
+pca <- prcomp(dfFingerprints2, center = TRUE, scale. = TRUE)
+
+summary(pca)
+plot(pca)
+
+```
+```{r}
+set.seed(042760)
+
+library(pls)
+i <- createDataPartition(dfAll[,389], p = .8, list=FALSE)
+
+dfTrain <- dfAll[i, ]
+dfTest <- dfAll[-i, ]
+
+dfTrain2 <- dfTrain[,-389]
+dfTest2 <- dfTest[,-389]
+yTrain <- dfTrain[,389]
+yTest <- dfTest[,389]
+
+model1 <- plsr(permeability ~ ., data=dfTrain, scale=TRUE, validation="CV")
+summary(model1)
+model1
+
+```
+```{r}
+
+set.seed(042760)
+ctrl <- trainControl(method = "cv", number = 10)
+
+model2 <- train(dfTrain2, yTrain, method = "pls", 
+             tuneLength = 20, trControl = ctrl, preProc = c("center", "scale"))
+
+summary(model2)
+plot(model2) 
+model2
+
+```
+
+```{r}
+
+validationplot(model1)
+validationplot(model1, val.type="MSEP")
+validationplot(model1, val.type="R2")
+
+
+```
+
+
+```{r}
+
+set.seed(042760)
+dfTest2 <- dfTest[,-389]
+y2 <- dfTest[,389]
+
+predictions <- predict(model1, dfTest2, ncomp=6)
+sqrt(mean((predictions - y2)^2))
+
+
+```
+__*Try building other models discussed in this chapter. Do any have better  predictive performance?  (f) Would you recommend any of your models to replace the permeability  laboratory experiment? *__. 
+
+```{r}
+
+library(glmnet)
+x <- data.matrix(dfTrain2)
+xtest <- data.matrix(dfTest2)
+
+#We find the optimal lambda by performing k-fold cross validation:
+
+mcv <- cv.glmnet(x, yTrain, alpha = 0)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+#plot(model, xvar = "lambda")
+
+m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1)
+summary(m10)
+
+```
+
+```{r}
+
+predictions <- predict(m10, xtest)
+sqrt(mean((predictions - yTest)^2))
+
+```
+```{r}
+
+library(glmnet)
+x <- data.matrix(dfTrain2)
+xtest <- data.matrix(dfTest2)
+
+#We find the optimal lambda by performing k-fold cross validation:
+
+mcv <- cv.glmnet(x, yTrain, alpha = 1)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+#plot(model, xvar = "lambda")
+
+m10 <- glmnet(x, yTrain, alpha = 1, lambda = lambda1)
+summary(m10)
+
+predictions <- predict(m10, xtest)
+sqrt(mean((predictions - yTest)^2))
+```
+
+```{r}
+data(ChemicalManufacturingProcess)
+
+dfChem <- ChemicalManufacturingProcess
+summary(dfChem)
+```
+
+```{r}
+
+EHSummarize_MissingValues(dfChem)
+dfChem2 <- EHPrepare_MissingValues_Imputation(dfChem)
+
+```
+
+```{r}
+
+EHExplore_Multicollinearity(dfChem2, printHeatMap = FALSE, printHighest = TRUE)
+```
+(c) Split the data into a training and a test set, pre-process the data, and  tune a model of your choice from this chapter. What is the optimal value  of the performance metric?  
+
+Ridge is lower.
+
+```{r}
+
+set.seed(042760)
+
+library(pls)
+i <- createDataPartition(dfChem2[,1], p = .8, list=FALSE)
+
+dfTrain <- dfChem2[i, ]
+dfTest <- dfChem2[-i, ]
+
+dfTrain2 <- dfTrain[,-1]
+dfTest2 <- dfTest[,-1]
+yTrain <- dfTrain[,1]
+yTest <- dfTest[,1]
+
+
+library(glmnet)
+x <- data.matrix(dfTrain2)
+xtest <- data.matrix(dfTest2)
+
+#We find the optimal lambda by performing k-fold cross validation:
+
+mcv <- cv.glmnet(x, yTrain, alpha = 0)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+#plot(model, xvar = "lambda")
+
+m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1)
+summary(m10)
+
+plot(m10, xvar = "lambda")
+
+#sqrt(m10$cvm[lambda = lambda1])
+
+predictions <- predict(m10, xtest)
+sqrt(mean((predictions - yTest)^2))
+
+```
+
+```{r}
+
+training_folds <- createFolds(dfChem2, returnTrain = TRUE )
+
+ctl <- trainControl( method = "cv", number = 10, index = training_folds )
+
+dmv_pp <- preProcess( dfChem2, method = c( "nzv", "center", "scale" ))
+
+
+dmv_train <- predict( dmv_pp, dfChem2 )
+# Using just a subset of the data, because otherwise I run out of memory.
+mdl <- train(Yield ~ ., data = dmv_train, trControl = ctl,  method = "glmnet",
+              tuneGrid = expand.grid(
+                alpha = c( 0, 0.5, 1),
+                lambda = c( 0.001, 0.01 )
+              )
+          )
+
+mdl$resample %>% names()
+
+```
+
+
