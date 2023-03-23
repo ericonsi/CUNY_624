@@ -70,7 +70,7 @@ tsATM4 <- CreateAtmTsibble("ATM4")
 
 __1. Examine the data.__
 
-First we look at a boxplot, histogram and decomposition of the data. It shows a number of strange patterns, not the least of which is that the money removed from the ATMs is not in multiples of twenty.  Also, the distribution is bimodal.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
+First we look at a boxplot, histogram and decomposition of the data. The distribution has a strange bimodal pattern.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
 
 
 ```{r, fig.height=2}
@@ -275,7 +275,7 @@ forecast::autoplot(tsATM1b) + labs(title="ATM1 Aggregated by Month")
 
 __1. Examine the data.__
 
-First we look at a boxplot, histogram and decomposition of the data. It shows similar irregularities as ATM1, including the bimodal distribution and cash not in multiples of twenty.    There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
+First we look at a boxplot, histogram and decomposition of the data. It shows similar irregularities as ATM1, including the bimodal distribution. There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
 
 
 ```{r, fig.height=2}
@@ -565,6 +565,8 @@ tsForecast5 <- tsForecast3 %>%
 ```
 
 __2. We will train using various methods on 75% of the data.__
+
+This time instead of an additive ETS model we use a multiplicative to capture the exponential trend.
 
 ```{r}
 
