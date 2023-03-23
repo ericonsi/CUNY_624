@@ -225,6 +225,10 @@ fc4d %>%
 
 report(fit4d)
 sum(fc4d$.mean)
+ 
+library(writexl)
+dfProjection <- as.data.frame(fc4d$.mean)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM1_Forecast.xlsx")
 
 ```
 Now we look at total May cash using ETS(AAN).  The sum is $2,465.  There is only a $63 difference despite the lack of a seasonal component in the ATM. We can see from the Monthly cash plot that May's cash haul last year was comparable, so we split the difference - $2,435.
@@ -246,6 +250,11 @@ fc4d %>%
 
 report(fit4d)
 sum(fc4d$.mean)
+ 
+library(writexl)
+dfProjection <- as.data.frame(fc4d$.mean)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM1_Forecast_ETS.xlsx")
+
 
 ```
 
@@ -349,6 +358,9 @@ fc2 %>%
 
 report(fit2)
 sum(rr2)
+
+dfProjection <- as.data.frame(rr2)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM2_Forecast.xlsx")
 
 ```
 
@@ -491,6 +503,9 @@ fc4 %>%
 
 report(fit4)
 sum(rr4)
+
+dfProjection <- as.data.frame(rr4)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM4_Forecast.xlsx")
 
 ```
 ```{r}
@@ -660,6 +675,8 @@ fcKWH %>%
 
 report(fitKWH)
 sum(rrKWH)
+dfProjection <- as.data.frame(rrKWH)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\KWH_Forecast_ETS.xlsx")
 
 ```
 
@@ -684,6 +701,9 @@ fcKWH %>%
 
 report(fitKWH)
 sum(rrKWH)
+
+dfProjection <- as.data.frame(rrKWH)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\KWH_Forecast_ARIMA.xlsx")
 
 ```
 
