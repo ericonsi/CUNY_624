@@ -1,7 +1,7 @@
 ---
 title: "Eric_Hirsch_624_Project_1"
 output: html_document
-date: "2023-02-24"
+date: "2023-03-22"
 ---
 
 ```{r setup, include=FALSE}
@@ -70,7 +70,7 @@ tsATM4 <- CreateAtmTsibble("ATM4")
 
 __1. Examine the data.__
 
-First we look at a boxplot, histogram and decomposition of the data. It shows a number of strange patterns, not the least of which is that the money removed from the ATMs is not in multiples of twenty.  Also, the distribution is bimodal.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
+First we look at a boxplot, histogram and decomposition of the data. The distribution has a strange bimodal pattern.  There are possible outliers but none of them are too out of range. Since we have no contextual information, we simply move forward.
 
 
 ```{r, fig.height=2}
@@ -225,6 +225,10 @@ fc4d %>%
 
 report(fit4d)
 sum(fc4d$.mean)
+ 
+library(writexl)
+dfProjection <- as.data.frame(fc4d$.mean)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM1_Forecast.xlsx")
 
 ```
 Now we look at total May cash using ETS(AAN).  The sum is $2,465.  There is only a $63 difference despite the lack of a seasonal component in the ATM. We can see from the Monthly cash plot that May's cash haul last year was comparable, so we split the difference - $2,435.
@@ -246,6 +250,11 @@ fc4d %>%
 
 report(fit4d)
 sum(fc4d$.mean)
+ 
+library(writexl)
+dfProjection <- as.data.frame(fc4d$.mean)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM1_Forecast_ETS.xlsx")
+
 
 ```
 
@@ -266,7 +275,7 @@ forecast::autoplot(tsATM1b) + labs(title="ATM1 Aggregated by Month")
 
 __1. Examine the data.__
 
-First we look at a boxplot, histogram and decomposition of the data. It shows similar irregularities as ATM1, including the bimodal distribution and cash not in multiples of twenty.    There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
+First we look at a boxplot, histogram and decomposition of the data. It shows similar irregularities as ATM1, including the bimodal distribution. There are no apparent outliers.  Variance may be falling over time so a boxcox is employed here.
 
 
 ```{r, fig.height=2}
@@ -349,6 +358,9 @@ fc2 %>%
 
 report(fit2)
 sum(rr2)
+
+dfProjection <- as.data.frame(rr2)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM2_Forecast.xlsx")
 
 ```
 
@@ -492,6 +504,9 @@ fc4 %>%
 report(fit4)
 sum(rr4)
 
+dfProjection <- as.data.frame(rr4)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\ATM4_Forecast.xlsx")
+
 ```
 ```{r}
 
@@ -550,6 +565,8 @@ tsForecast5 <- tsForecast3 %>%
 ```
 
 __2. We will train using various methods on 75% of the data.__
+
+This time instead of an additive ETS model we use a multiplicative to capture the exponential trend.
 
 ```{r}
 
@@ -660,6 +677,8 @@ fcKWH %>%
 
 report(fitKWH)
 sum(rrKWH)
+dfProjection <- as.data.frame(rrKWH)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\KWH_Forecast_ETS.xlsx")
 
 ```
 
@@ -684,6 +703,9 @@ fcKWH %>%
 
 report(fitKWH)
 sum(rrKWH)
+
+dfProjection <- as.data.frame(rrKWH)
+write_xlsx(dfProjection, "D:\\RStudio\\CUNY_624\\Project1\\KWH_Forecast_ARIMA.xlsx")
 
 ```
 
