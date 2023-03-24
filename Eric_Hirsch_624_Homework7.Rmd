@@ -173,6 +173,8 @@ predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
 ```
 
+6.3
+
 ```{r}
 data(ChemicalManufacturingProcess)
 
