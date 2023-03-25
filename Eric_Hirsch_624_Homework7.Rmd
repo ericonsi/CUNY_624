@@ -175,12 +175,17 @@ sqrt(mean((predictions - yTest)^2))
 
 6.3
 
+The matrix processPredictors contains the 57 predictors (12 describing  the input biological material and 45 describing the process predictors)  for the 176 manufacturing runs. yield contains the percent yield for each  run. 
+
+
 ```{r}
 data(ChemicalManufacturingProcess)
 
 dfChem <- ChemicalManufacturingProcess
 summary(dfChem)
 ```
+
+(b) A small percentage of cells in the predictor set contain missing values. Use  an imputation function to fill in these missing values (e.g., see Sect. 3.8).  
 
 ```{r}
 
@@ -219,45 +224,48 @@ xtest <- data.matrix(dfTest2)
 
 #We find the optimal lambda by performing k-fold cross validation:
 
-mcv <- cv.glmnet(x, yTrain, alpha = 0)
+mcv <- cv.glmnet(x, yTrain, alpha = 1)
 plot(mcv)
 
 lambda1 <- mcv$lambda.min
 
-#plot(model, xvar = "lambda")
-
-m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1)
-summary(m10)
+m10 <- glmnet(x, yTrain, alpha = 1, lambda = lambda1)
 
 plot(m10, xvar = "lambda")
 
-#sqrt(m10$cvm[lambda = lambda1])
+print("Train")
+predictions <- predict(m10, as.matrix(dfTrain2))
+sqrt(mean((predictions - yTrain)^2))
 
+```
+
+(d) Predict the response for the test set. What is the value of the performance  metric and how does this compare with the resampled performance metric  on the training set?  
+
+```{r}
+
+print("Test")
 predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
 
 ```
 
+(e) Which predictors are most important in the model you have trained? Do  either the biological or process predictors dominate the list?  
+
 ```{r}
-
-training_folds <- createFolds(dfChem2, returnTrain = TRUE )
-
-ctl <- trainControl( method = "cv", number = 10, index = training_folds )
-
-dmv_pp <- preProcess( dfChem2, method = c( "nzv", "center", "scale" ))
-
-
-dmv_train <- predict( dmv_pp, dfChem2 )
-# Using just a subset of the data, because otherwise I run out of memory.
-mdl <- train(Yield ~ ., data = dmv_train, trControl = ctl,  method = "glmnet",
-              tuneGrid = expand.grid(
-                alpha = c( 0, 0.5, 1),
-                lambda = c( 0.001, 0.01 )
-              )
-          )
-
-mdl$resample %>% names()
-
+m10
+co <- as.data.frame(as.matrix(m10["beta"]))
+m10["beta"]["x"]
+coef(m10)
 ```
 
+
+(f) Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future  runs of the manufacturing process? 
+```{r}
+
+dfGo <- dfChem2 %>%
+  dplyr::select(BiologicalMaterial05, BiologicalMaterial07, BiologicalMaterial09, ManufacturingProcess18, ManufacturingProcess30, Yield)
+
+EHSummarize_StandardPlots(dfGo, "Yield")
+
+```
 
