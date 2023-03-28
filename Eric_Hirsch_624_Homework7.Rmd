@@ -261,14 +261,6 @@ coef(m10)
   
 ```
 
-```{r}
-
-pls_importance <- varImp(m10, lambda = lambda1)$importance %>% 
-  as.data.frame() 
-```
-
-
-
 __*6.3f Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future  runs of the manufacturing process?*__
 
 
