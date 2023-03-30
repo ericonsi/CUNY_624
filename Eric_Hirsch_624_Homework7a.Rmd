@@ -2,12 +2,11 @@
 title: "Eric_Hirsch_624_Homework_7"
 
 output:
-  html_document:
-    code_folding: hide
+  html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
@@ -104,7 +103,7 @@ model2
 
 ```
 
-The highest R2 is .45, with the number of components considered only 5.  
+The highest R2 is .44, with the number of components considered only 5.  
 
 __*6.d (d) Predict the response for the test set. What is the test set estimate of R2?*__
 
@@ -136,7 +135,7 @@ We try LASSO. It performs better with an R squared  of .60. I would possibly use
 
 __However, I would most likely do this instead:__
 
-There are more variables than observations, so we won't be able to perform OLS.  However, there are *over 2,000 unique pairs* of predictors with correlations over 90%, including 152 pairs of perfectly correlated predictors. If were to remove indicators which give us virtually no information, we may be able to reduce the number of predictors down far enough to perform OLS.  In any case, cleaning the dataset first would be the best option, no matter what technique we use.
+There are more variables than observations, so we won't be able to perform OLS.  However, there are __*over 2,000 unique pairs*__ of predictors with correlations over 90%, including 152 pairs of perfectly correlated predictors. If were to remove indicators which give us virtually no information, we may be able to reduce the number of predictors down far enough to perform OLS.  In any case, cleaning the dataset first would be the best option, no matter what technique we use.
 
 
 ```{r}
@@ -189,7 +188,7 @@ print(paste("Unique pairs of predictors:", q))
 
 6.3
 
-The matrix processPredictors contains the 57 predictors (12 describing  the input biological material and 45 describing the process predictors)  for the 176 manufacturing runs. Yield contains the percent yield for each run. 
+__*The matrix processPredictors contains the 57 predictors (12 describing the input biological material and 45 describing the process predictors)  for the 176 manufacturing runs. Yield contains the percent yield for each run.*__ 
 
 
 ```{r}
@@ -198,28 +197,29 @@ data(ChemicalManufacturingProcess)
 dfChem <- ChemicalManufacturingProcess
 ```
 
-(b) A small percentage of cells in the predictor set contain missing values. Use  an imputation function to fill in these missing values (e.g., see Sect. 3.8).  
+__*6.3(b) A small percentage of cells in the predictor set contain missing values. Use  an imputation function to fill in these missing values*__
 
-The number of missing values is low.  Furthermore, variances for many of the columns is low.  We therefore use mean imputation for the missing values.
+The number of missing values is very low, (although one predictor has 15 missing values, or 8%.) Using a "simple is best approach", we will impute the median (since we can see some skewing, and the median is more robust than the mean.)
 
-The data is marked by a great degree of multicollinearity. For example, 10 predictor pairs have correlations of .95 or higher.
+The data is marked by a great degree of multicollinearity. For example, 15 predictor pairs have correlations of .90 or higher. This is especially true among manufacturing process pairs.
 
 ```{r}
+summary(dfChem)
 
 EHSummarize_MissingValues(dfChem)
-dfChem2 <- EHPrepare_MissingValues_Imputation(dfChem)
+dfChem2 <- EHPrepare_MissingValues_Imputation(dfChem, impute = "median")
 
 ```
 
 ```{r}
 
-EHExplore_Multicollinearity(dfChem2, printHeatMap = FALSE, threshold=.95, printHighest = TRUE)
+q <- EHExplore_Multicollinearity(dfChem2, printHeatMap = FALSE, threshold=.90, printHighest = TRUE)
 ```
-(c) Split the data into a training and a test set, pre-process the data, and  tune a model of your choice from this chapter. What is the optimal value of the performance metric?  
+__*(c) Split the data into a training and a test set, pre-process the data, and  tune a model of your choice from this chapter. What is the optimal value of the performance metric?*__
 
-We choose LASSO regression for our model.  LASSO has the advantage that it will eliminate unneeded indoicators, making for a more readable and intuitive model.
+We choose LASSO regression for our model.  LASSO has the advantage that it will eliminate unneeded indicators.
 
-In order to compare models, we will use the RMSE, which gives us a sense of the distribution of errors our model is generating.
+In order to compare models, we will use the RMSE, which gives us the best intuitive sense of the distribution of errors our model is generating.
 
 The RMSE on the training set is .40.
 
@@ -259,7 +259,7 @@ sqrt(mean((predictions - yTrain)^2))
 
 (d) Predict the response for the test set. What is the value of the performance  metric and how does this compare with the resampled performance metric  on the training set?  
 
-On the test set, the RMSE is .57.  This is somewhat higher.
+On the test set, the RMSE is .56.  This is somewhat higher.  Given that the mean of Yield is 40, an RMSE of .56 suggests we are getting reasonably good predictions.
 
 ```{r}
 
@@ -267,11 +267,16 @@ print("Test")
 predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
 
+print(paste("Mean of yield:", mean(dfChem3$Yield)))
 ```
 
-(e) Which predictors are most important in the model you have trained? Do  either the biological or process predictors dominate the list?  
+__*(e) Which predictors are most important in the model you have trained? Do  either the biological or process predictors dominate the list?*__
 
-As expected, the LASSO model eliminates a number of predictors from the model.  In all, only 13 predictors are preserved. The percentage of biological predictors preserved is higher than those of process, and they have the highest coefficents.  Therefore, they are more important. 
+"Dominate the list" is not here defined.There are far more process predictors to begin with, so they automatically dominate the list. 
+
+However, as expected, the LASSO model eliminates a number of predictors from the model.  In all, only 13 predictors are preserved. The percentage of biological predictors preserved is higher than those of process, and they have the highest coefficents.  Since the predictors are scaled, we may consider them to "dominate the list."
+
+__It must be noted, however__ that when we ran a ridge regression, the results were more mixed. Interpretation is tricky when regularization is present.
 
 ```{r}
 library(broom)
@@ -282,7 +287,7 @@ coef(m10)
 
 __*6.3f Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future  runs of the manufacturing process?*__
 
-
+The key to this exercise is navigating multicollinearity.  By reducing the model to a smaller set of key indicators that capture the information of most of the other indicators, the manufacturing process is greatly simplified.  All of the factors are correlated with yield - but with the process predictors we can have more influence over yields. We might drill down to find the highest process indicators, or we might use the biological ones to better assess quality.
 
 ```{r}
 
@@ -290,7 +295,9 @@ __*6.3f Explore the relationships between each of the top predictors and the res
 zz <- tidy(m10) %>%
   dplyr::select(term, estimate) |>
   arrange(desc(abs(estimate)))
-zz
+
+print("Top 5 indicators using Lasso")
+head(zz,5)
   
 dfGo <- dfChem2 %>%
   dplyr::select(BiologicalMaterial01, BiologicalMaterial02, BiologicalMaterial08, ManufacturingProcess01, BiologicalMaterial03, Yield)
