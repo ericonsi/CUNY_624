@@ -1,0 +1,271 @@
+---
+title: "Eric_Hirsch_624_Homework_8"
+
+output:
+  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(EHData)
+library(gridExtra)
+library(caret)
+library(AppliedPredictiveModeling)
+
+```
+
+7.2, 7.5
+
+#### 7.2 Friedman (1991) introduced several benchmark data sets created by simulation ... Tune several models on these data ... Which models appear to give the best performance? Does MARS select the  informative predictors (those named X1–X5)?
+
+```{r}
+
+
+library(mlbench)
+set.seed(200)
+trainingData <- mlbench.friedman1(200, sd = 1)  
+trainingData$x <- data.frame(trainingData$x)  
+featurePlot(trainingData$x, trainingData$y)  
+testData <- mlbench.friedman1(5000, sd = 1)  
+testData$x <- data.frame(testData$x) 
+```
+
+__1. K-Nearest Neighbors__ 
+
+```{r}
+
+library(caret)
+knnModel <- train(x = trainingData$x, y = trainingData$y, method = "knn", preProc = c("center", "scale"), tuneLength = 10)
+knnModel  
+
+knnPred <- predict(knnModel, newdata = testData$x)
+postResample(pred = knnPred, obs = testData$y) 
+
+
+```
+
+__2. Neural Network__
+
+```{r}
+set.seed(042760)
+library(nnet)
+nnetFit <- nnet(trainingData$x, trainingData$y,
+                size = 5,
+                decay = 0.06,
+                linout = TRUE,
+                trace = FALSE,
+                maxit = 500,
+                MaxNWts = 5 * (ncol(trainingData$x) + 1) +5 +1)
+nnetFit
+
+nnetPred <- predict(nnetFit, newdata = testData$x)
+postResample(pred = nnetPred, obs = testData$y)
+
+```
+
+__3. MARS__
+
+```{r}
+library(earth)
+marsFit <- earth(trainingData$x, trainingData$y)
+marsFit
+
+marsPred <- predict(marsFit, newdata = testData$x)
+postResample(pred = marsPred, obs = testData$y)
+
+```
+
+__4. SVM (linear and radial)__
+
+```{r}
+library(caret)
+
+svm_Radial <- train(trainingData$x, trainingData$y,
+                   method = "svmRadial",
+                   preProc = c("center","scale"),
+                   tuneLength = 14,
+                   trControl = trainControl(method = "cv"))
+
+svm_Radial
+
+svmPredR <- predict(svm_Radial, newdata = testData$x)
+postResample(pred = svmPredR, obs = testData$y)
+
+print('')
+print('___________________________________________')
+print('')
+
+svm_Linear <- train(trainingData$x, trainingData$y,
+                   method = "svmLinear",
+                   preProc = c("center","scale"),
+                   tuneLength = 14,
+                   trControl = trainControl(method = "cv"))
+
+svm_Linear
+
+
+svmPredL <- predict(svm_Linear, newdata = testData$x)
+postResample(pred = svmPredL, obs = testData$y)
+
+
+```
+
+The models create RMSEs of between 1.8 and 3.2.  Given that the mean y value is 14 and the standard deviation is 5, an RMSE of 1.8 is relatively low.  This model (MARS) also had an R-Squared of .87, which also suggests a relatively reasonable fit.  MARS uses the fist six indicators in this case.
+
+KNN is not generally considered a highly powerful model so it is not surprising that its predictive power is low.  NNet was very sensistive to decay.  At a decay of .06, the model actually outperforms MARS.  The SVM models performed in between  - the radial was more accurate than the Linear.
+
+```{r}
+
+averageY <- mean(testData$y)
+sdY <- sd(testData$y)
+
+tab <- matrix(c("KNN", 3.2, .68, "NeuralNet", 2.4, .77, "MARS", 1.8, .87, "SVM-Linear", 2.8, .70,"SVM_Radial",2.1,.83), ncol=3, byrow=TRUE)
+colnames(tab) <- c('Model','RMSE','RSquared')
+tab <- as.table(tab)
+tab
+
+averageY 
+sdY
+
+```
+
+
+#### 7.5. Exercise 6.3 describes data for a chemical manufacturing process. Use  the same data imputation, data splitting, and pre-processing steps as before  and train several nonlinear regression models.  (a) Which nonlinear regression model gives the optimal resampling and test  set performance?  (b) Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the  list? How do the top ten important predictors compare to the top ten  predictors from the optimal linear model?  (c) Explore the relationships between the top predictors and the response for  the predictors that are unique to the optimal nonlinear regression model.  Do these plots reveal intuition about the
+
+```{r}
+
+data(ChemicalManufacturingProcess)
+
+dfChem <- ChemicalManufacturingProcess
+dfChem2 <- EHPrepare_MissingValues_Imputation(dfChem, impute = "median")
+dfChem3 <- EHPrepare_ScaleAllButTarget(dfChem2, "Yield")
+
+set.seed(042760)
+
+i <- createDataPartition(dfChem3[,1], p = .8, list=FALSE)
+
+dfTrain <- dfChem3[i, ]
+dfTest <- dfChem3[-i, ]
+
+dfTrain2 <- dfTrain[,-1]
+dfTest2 <- dfTest[,-1]
+yTrain <- dfTrain[,1]
+yTest <- dfTest[,1]
+
+trainingData$x <- dfTrain2
+trainingData$y <- yTrain
+testData$x <- dfTest2
+testData$y <- yTest
+
+
+
+
+```
+
+```{r}
+
+library(caret)
+knnModel <- train(x = trainingData$x, y = trainingData$y, method = "knn", preProc = c("center"), tuneLength = 10)
+knnModel  
+
+
+```
+
+```{r}
+
+knnPred <- predict(knnModel, newdata = testData$x)
+postResample(pred = knnPred, obs = testData$y) 
+
+```
+Neural Network
+
+```{r}
+library(nnet)
+set.seed(042762)
+nnetFit <- nnet(trainingData$x, trainingData$y,
+                size = 5,
+                decay = 0.01,
+                linout = TRUE,
+                trace = FALSE,
+                maxit = 500,
+                MaxNWts = 5 * (ncol(trainingData$x) + 1) +5 +1)
+
+nnetPred <- predict(nnetFit, newdata = testData$x)
+postResample(pred = nnetPred, obs = testData$y)
+
+```
+
+MARS
+
+```{r}
+set.seed(042762)
+library(earth)
+marsFit <- earth(trainingData$x, trainingData$y)
+marsFit
+
+marsPred <- predict(marsFit, newdata = testData$x)
+postResample(pred = marsPred, obs = testData$y)
+
+```
+
+SVM
+
+```{r}
+library(caret)
+
+svm_Radial <- train(trainingData$x, trainingData$y,
+                   method = "svmRadial",
+                   preProc = c("center"),
+                   tuneLength = 14,
+                   trControl = trainControl(method = "cv"))
+
+svm_Radial
+
+svmPredR <- predict(svm_Radial, newdata = testData$x)
+postResample(pred = svmPredR, obs = testData$y)
+
+print('')
+print('___________________________________________')
+print('')
+
+svm_Linear <- train(trainingData$x, trainingData$y,
+                   method = "svmLinear",
+                   preProc = c("center","scale"),
+                   tuneLength = 14,
+                   trControl = trainControl(method = "cv"))
+
+svm_Linear
+
+
+svmPredL <- predict(svm_Linear, newdata = testData$x)
+postResample(pred = svmPredL, obs = testData$y)
+
+
+```
+
+```{r}
+
+svmImp <- varImp(nnetFit) %>%
+  arrange(desc(abs(Overall)))
+svmImp
+
+
+
+```
+
+
+The top 12 factors are biological - so this puts more processing fatcors at the forefront.  There is little overlap between the two.
+
+```{r}
+
+dfGo <- dfChem2 %>%
+  dplyr::select(BiologicalMaterial04, ManufacturingProcess11, ManufacturingProcess21, ManufacturingProcess37, ManufacturingProcess23, Yield)
+
+EHSummarize_StandardPlots(dfGo, "Yield")
+
+```
