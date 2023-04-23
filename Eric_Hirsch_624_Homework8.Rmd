@@ -51,20 +51,22 @@ postResample(pred = knnPred, obs = testData$y)
 
 __2. Neural Network__
 
+Decay = .06, size = 5.
+
 ```{r}
 set.seed(042760)
 library(nnet)
-nnetFit <- nnet(trainingData$x, trainingData$y,
+nn <- nnet(trainingData$x, trainingData$y,
                 size = 5,
                 decay = 0.06,
                 linout = TRUE,
                 trace = FALSE,
                 maxit = 500,
                 MaxNWts = 5 * (ncol(trainingData$x) + 1) +5 +1)
-nnetFit
+nn
 
-nnetPred <- predict(nnetFit, newdata = testData$x)
-postResample(pred = nnetPred, obs = testData$y)
+nnPred <- predict(nn, newdata = testData$x)
+postResample(pred = nnPred, obs = testData$y)
 
 ```
 
@@ -72,10 +74,10 @@ __3. MARS__
 
 ```{r}
 library(earth)
-marsFit <- earth(trainingData$x, trainingData$y)
-marsFit
+mars <- earth(trainingData$x, trainingData$y)
+mars
 
-marsPred <- predict(marsFit, newdata = testData$x)
+marsPred <- predict(mars, newdata = testData$x)
 postResample(pred = marsPred, obs = testData$y)
 
 ```
@@ -88,7 +90,6 @@ library(caret)
 svm_Radial <- train(trainingData$x, trainingData$y,
                    method = "svmRadial",
                    preProc = c("center","scale"),
-                   tuneLength = 14,
                    trControl = trainControl(method = "cv"))
 
 svm_Radial
@@ -115,16 +116,16 @@ postResample(pred = svmPredL, obs = testData$y)
 
 ```
 
-The models create RMSEs of between 1.8 and 3.2.  Given that the mean y value is 14 and the standard deviation is 5, an RMSE of 1.8 is relatively low.  This model (MARS) also had an R-Squared of .87, which also suggests a relatively reasonable fit.  MARS uses the fist six indicators in this case.
+The models create RMSEs of between 1.5 and 3.2.  Given that the mean y value is 14 and the standard deviation is 5, an RMSE of 1.5 is relatively low.  This model (Neural Net) also had an R-Squared of .91, which also suggests a relatively reasonable fit.  MARS uses the fist six indicators in this case.
 
-KNN is not generally considered a highly powerful model so it is not surprising that its predictive power is low.  NNet was very sensistive to decay.  At a decay of .06, the model actually outperforms MARS.  The SVM models performed in between  - the radial was more accurate than the Linear.
+KNN is not generally considered a highly powerful model so it is not surprising that its predictive power is low.  NNet was very sensitive to decay.  At a decay of .06, the model outperforms MARS but at ,01 it does not.  The SVM models performed in between  - the radial was more accurate than the Linear.
 
 ```{r}
 
 averageY <- mean(testData$y)
 sdY <- sd(testData$y)
 
-tab <- matrix(c("KNN", 3.2, .68, "NeuralNet", 2.4, .77, "MARS", 1.8, .87, "SVM-Linear", 2.8, .70,"SVM_Radial",2.1,.83), ncol=3, byrow=TRUE)
+tab <- matrix(c("KNN", 3.2, .68, "NeuralNet", 1.5, .91, "MARS", 1.8, .87, "SVM-Linear", 2.8, .70,"SVM_Radial",2.1,.83), ncol=3, byrow=TRUE)
 colnames(tab) <- c('Model','RMSE','RSquared')
 tab <- as.table(tab)
 tab
@@ -135,7 +136,7 @@ sdY
 ```
 
 
-#### 7.5. Exercise 6.3 describes data for a chemical manufacturing process. Use  the same data imputation, data splitting, and pre-processing steps as before  and train several nonlinear regression models.  (a) Which nonlinear regression model gives the optimal resampling and test  set performance?  (b) Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the  list? How do the top ten important predictors compare to the top ten  predictors from the optimal linear model?  (c) Explore the relationships between the top predictors and the response for  the predictors that are unique to the optimal nonlinear regression model.  Do these plots reveal intuition about the
+#### 7.5. Exercise 6.3 describes data for a chemical manufacturing process. Use  the same data imputation, data splitting, and pre-processing steps as before  and train several nonlinear regression models.  (a) Which nonlinear regression model gives the optimal resampling and test  set performance?  
 
 ```{r}
 
@@ -166,6 +167,7 @@ testData$y <- yTest
 
 
 ```
+__1. KNN __
 
 ```{r}
 
@@ -182,38 +184,40 @@ knnPred <- predict(knnModel, newdata = testData$x)
 postResample(pred = knnPred, obs = testData$y) 
 
 ```
-Neural Network
+__2. Neural Network__
+
+Decay = .03, size = 4.
 
 ```{r}
 library(nnet)
 set.seed(042762)
-nnetFit <- nnet(trainingData$x, trainingData$y,
-                size = 5,
-                decay = 0.01,
+nn <- nnet(trainingData$x, trainingData$y,
+                size = 4,
+                decay = 0.03,
                 linout = TRUE,
                 trace = FALSE,
                 maxit = 500,
                 MaxNWts = 5 * (ncol(trainingData$x) + 1) +5 +1)
 
-nnetPred <- predict(nnetFit, newdata = testData$x)
-postResample(pred = nnetPred, obs = testData$y)
+nnPred <- predict(nn, newdata = testData$x)
+postResample(pred = nnPred, obs = testData$y)
 
 ```
 
-MARS
+__3. MARS__
 
 ```{r}
 set.seed(042762)
 library(earth)
-marsFit <- earth(trainingData$x, trainingData$y)
-marsFit
+mars <- earth(trainingData$x, trainingData$y)
+mars
 
-marsPred <- predict(marsFit, newdata = testData$x)
+marsPred <- predict(mars, newdata = testData$x)
 postResample(pred = marsPred, obs = testData$y)
 
 ```
 
-SVM
+__4. SVM__
 
 ```{r}
 library(caret)
@@ -221,7 +225,6 @@ library(caret)
 svm_Radial <- train(trainingData$x, trainingData$y,
                    method = "svmRadial",
                    preProc = c("center"),
-                   tuneLength = 14,
                    trControl = trainControl(method = "cv"))
 
 svm_Radial
@@ -236,7 +239,6 @@ print('')
 svm_Linear <- train(trainingData$x, trainingData$y,
                    method = "svmLinear",
                    preProc = c("center","scale"),
-                   tuneLength = 14,
                    trControl = trainControl(method = "cv"))
 
 svm_Linear
@@ -248,23 +250,51 @@ postResample(pred = svmPredL, obs = testData$y)
 
 ```
 
+The models create RMSEs of between .56 and .65 (and an outlier .95 for linear SVM).  Given that the mean y value is about 0 and the standard deviation is 1.15, an RMSE of 5.6 is reasonable. This model (again Neural Net) also had an R-Squared of .80, which also suggests a relatively reasonable fit.
+
+With the exception of KNN and linear SVM, all of the models are within a small range. The Lasso model perfomed for homework 7 is also a strong contender, with very comparable scores to the neural net.  
+
+
 ```{r}
 
-svmImp <- varImp(nnetFit) %>%
+averageY <- mean(testData$y)
+sdY <- sd(testData$y)
+
+tab <- matrix(c("KNN", .65, .69, "NeuralNet", .56, .80, "MARS", .58, .75, "SVM-Linear", .95, .40,"SVM_Radial",.60,.75, "Lasso", .57, .80), ncol=3, byrow=TRUE)
+colnames(tab) <- c('Model','RMSE','RSquared')
+tab <- as.table(tab)
+tab
+
+averageY 
+sdY
+
+```
+
+__(b) Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the  list? How do the top ten important predictors compare to the top ten  predictors from the optimal linear model?__  
+
+The neural net model has more processing factors at the forefront than the Lasso model.  While the results are similar, there is little overlap between the sets of indicators chosen by the two models.
+
+```{r}
+set.seed(042760)
+svmImp <- varImp(nn) %>%
   arrange(desc(abs(Overall)))
-svmImp
+head(svmImp,10)
 
 
 
 ```
 
 
-The top 12 factors are biological - so this puts more processing fatcors at the forefront.  There is little overlap between the two.
+
+
+__(c) Explore the relationships between the top predictors and the response for  the predictors that are unique to the optimal nonlinear regression model.  Do these plots reveal intuition about the biological or process predictors and their relationship with yield?__
+
+Most of the biological indicators are highly correlated with yield, however the manufacturing indicators the r is low and the p is high.  This suggests that the model finds hidden relationships more important than individual correlations  Because of the high degree of multicollinearity, the model is looking for the unique set of indicators which explain variance, which may be certain indicators only in combination with other indicators.
 
 ```{r}
 
 dfGo <- dfChem2 %>%
-  dplyr::select(BiologicalMaterial04, ManufacturingProcess11, ManufacturingProcess21, ManufacturingProcess37, ManufacturingProcess23, Yield)
+  dplyr::select(BiologicalMaterial10, BiologicalMaterial01, ManufacturingProcess05, ManufacturingProcess43, ManufacturingProcess20, Yield)
 
 EHSummarize_StandardPlots(dfGo, "Yield")
 
