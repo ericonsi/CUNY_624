@@ -255,6 +255,8 @@ print("Train")
 predictions <- predict(m10, as.matrix(dfTrain2))
 sqrt(mean((predictions - yTrain)^2))
 
+
+
 ```
 
 (d) Predict the response for the test set. What is the value of the performance  metric and how does this compare with the resampled performance metric  on the training set?  
@@ -266,6 +268,8 @@ On the test set, the RMSE is .57.  This is somewhat higher.
 print("Test")
 predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
+
+postResample(pred = predictions, obs = yTest)
 
 ```
 

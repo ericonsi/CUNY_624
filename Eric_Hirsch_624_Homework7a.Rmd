@@ -296,8 +296,8 @@ zz <- tidy(m10) %>%
   dplyr::select(term, estimate) |>
   arrange(desc(abs(estimate)))
 
-print("Top 5 indicators using Lasso")
-head(zz,5)
+print("Top 10 indicators using Lasso")
+head(zz,10)
   
 dfGo <- dfChem2 %>%
   dplyr::select(BiologicalMaterial01, BiologicalMaterial02, BiologicalMaterial08, ManufacturingProcess01, BiologicalMaterial03, Yield)
