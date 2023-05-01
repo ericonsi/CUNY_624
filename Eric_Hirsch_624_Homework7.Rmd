@@ -20,7 +20,11 @@ library(AppliedPredictiveModeling)
 
 ```
 
+<<<<<<< HEAD
 6.1, 6.2
+=======
+6.2, 6.3
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 ```{r}
 
@@ -36,6 +40,7 @@ str(dfPermeability)
 ```
 
 
+<<<<<<< HEAD
 __*6.2b Filter out the predictors that have low frequencies using the nearZeroVar function from the caret package.  How many predictors are left for modeling?*__
 
 From 1107 to 388.
@@ -59,22 +64,67 @@ a <- EHExplore_Multicollinearity(dfFingerprints2, printHeatMap=FALSE, printHighe
 ```
 
 
+=======
+__*6.2b Developing a model to predict permeability could save significant resources for a pharmaceutical company, while at the same time more rapidly identifying molecules that have a sufficient permeability to become a drug. Filter out the predictors that have low frequencies using the nearZeroVar function from the caret package.  How many predictors are left for modeling?*__
+
+The number of predictors drop from 1107 to 388.
+
+```{r}
+dim(dfFingerprints)[2]
+dfFingerprints2 <- dfFingerprints[, -nearZeroVar(dfFingerprints)]
+dfAll <- cbind(dfFingerprints2, dfPermeability)
+dim(dfFingerprints2)[2]
+```
+
+
+__*6.12c Split the data into a training and a test set, pre-process the data, and tune a PLS model. How many latent variables are optimal and what is the corresponding resampled estimate of R2?*__
+
+First, some investigation.  There are no missing values.  Multicollinearity is a big issue here - there are 152 factors pairs that have correlations of 1. If we were to model this data properly we would remove many of these predictors. The following are just the first 10 perfectly correlated pairs:
+
+```{r}
+
+a <- EHExplore_Multicollinearity(threshold = .99, dfFingerprints2, printHeatMap=FALSE, printHighest = FALSE)
+
+head(as.data.frame(a[2]), 10)
+
+```
+
+PCA demonstrates that 95% of the variance is explained by only 27 components. 
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 ```{r}
 
 
 pca <- prcomp(dfFingerprints2, center = TRUE, scale. = TRUE)
+<<<<<<< HEAD
 
 summary(pca)
 plot(pca)
 
 ```
 ```{r}
+=======
+dfX <- as.data.frame(summary(pca)$importance[2,]) |>
+  mutate(Component=row_number()) |>
+  dplyr::rename(Variance = 1) |>
+  filter(row_number()<28) 
+
+ggplot(dfX, aes(Component, Variance)) +
+  geom_line() + ggtitle("Components by Variance Explained")
+
+```
+
+Thus, PLS should prove to be an effective model for this dataset. Now we separate the data into train and test sets and tune a PLS model.
+
+```{r}
+
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 set.seed(042760)
 
 library(pls)
 i <- createDataPartition(dfAll[,389], p = .8, list=FALSE)
 
+<<<<<<< HEAD
 dfTrain <- dfAll[i, ]
 dfTest <- dfAll[-i, ]
 
@@ -95,6 +145,20 @@ ctrl <- trainControl(method = "cv", number = 10)
 
 model2 <- train(dfTrain2, yTrain, method = "pls", 
              tuneLength = 20, trControl = ctrl, preProc = c("center", "scale"))
+=======
+a <- dfAll[i, ]
+b <- dfAll[-i, ]
+
+dfTrain_ExcludesY <- a[,-389]
+dfTest_ExcludesY <- b[,-389]
+
+yTrain <- a[,389]
+yTest <- b[,389]
+
+ctrl <- trainControl(method = "cv", number = 10)
+
+model2 <- train(dfTrain_ExcludesY, yTrain, method = "pls", metric='Rsquared', tuneLength=50, trControl = ctrl, preProc = c("center", "scale"))
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 summary(model2)
 plot(model2) 
@@ -102,6 +166,7 @@ model2
 
 ```
 
+<<<<<<< HEAD
 ```{r}
 
 validationplot(model1)
@@ -111,10 +176,18 @@ validationplot(model1, val.type="R2")
 
 ```
 
+=======
+The highest R2 is .45, with the number of components considered only 5.  
+
+__*6.d (d) Predict the response for the test set. What is the test set estimate of R2?*__
+
+Surprisingly, the model performed better on the test set: R Squared = .50.
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 ```{r}
 
 set.seed(042760)
+<<<<<<< HEAD
 dfTest2 <- dfTest[,-389]
 y2 <- dfTest[,389]
 
@@ -141,18 +214,76 @@ lambda1 <- mcv$lambda.min
 #plot(model, xvar = "lambda")
 
 m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1)
+=======
+
+predictions <- as.data.frame(predict(model2, dfTest_ExcludesY, ncomp=5))
+pred2 <- cbind(predictions, yTest) %>%
+  dplyr::rename(predictions = 1, actual=2) %>%
+  mutate(residSQ = (predictions-actual)^2)
+
+ymean = mean(pred2$actual)
+
+pred3 <- pred2 |>
+  mutate(SquaresTot = (actual-ymean)^2)
+  
+
+R2 <- 1 - sum(pred3$residSQ)/sum(pred3$SquaresTot)
+
+R2
+
+```
+__*3.2e Try building other models discussed in this chapter. Do any have better  predictive performance?  Would you recommend any of your models to replace the permeability laboratory experiment? *__. 
+
+We try LASSO. It performs better with an R squared  of .60. I would possibly use this model instead because of the better R Squared.
+
+__However, I would most likely do this instead:__
+
+There are more variables than observations, so we won't be able to perform OLS.  However, there are *over 2,000 unique pairs* of predictors with correlations over 90%, including 152 pairs of perfectly correlated predictors. If were to remove indicators which give us virtually no information, we may be able to reduce the number of predictors down far enough to perform OLS.  In any case, cleaning the dataset first would be the best option, no matter what technique we use.
+
+
+```{r}
+set.seed(042760)
+library(glmnet)
+xxTrain <- data.matrix(dfTrain_ExcludesY)
+xxTest <- data.matrix(dfTest_ExcludesY)
+
+mcv <- cv.glmnet(xxTrain, yTrain, alpha = 1)
+
+lambda1 <- mcv$lambda.min
+
+m10 <- glmnet(xxTrain, yTrain, alpha = 1, lambda = lambda1)
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 summary(m10)
 
 ```
 
 ```{r}
+<<<<<<< HEAD
 
 predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
+=======
+set.seed(042760)
+predictions <- as.data.frame(predict(m10, xxTest))
+pred2 <- cbind(predictions, yTest) %>%
+  dplyr::rename(predictions = 1, actual=2) %>%
+  mutate(residSQ = (predictions-actual)^2)
+
+ymean = mean(pred2$actual)
+
+pred3 <- pred2 |>
+  mutate(SquaresTot = (actual-ymean)^2)
+  
+
+R2 <- 1 - sum(pred3$residSQ)/sum(pred3$SquaresTot)
+
+R2
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 ```
 ```{r}
 
+<<<<<<< HEAD
 library(glmnet)
 x <- data.matrix(dfTrain2)
 xtest <- data.matrix(dfTest2)
@@ -173,13 +304,44 @@ predictions <- predict(m10, xtest)
 sqrt(mean((predictions - yTest)^2))
 ```
 
+=======
+b <- EHExplore_Multicollinearity(threshold = .90, dfFingerprints2, printHeatMap=FALSE, printHighest = FALSE)
+
+z<- as.data.frame(b[2])
+q <- dim(z)[1]
+
+print(paste("Unique pairs of predictors:", q))
+
+
+
+
+```
+
+
+6.3
+
+The matrix processPredictors contains the 57 predictors (12 describing  the input biological material and 45 describing the process predictors)  for the 176 manufacturing runs. Yield contains the percent yield for each run. 
+
+
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 ```{r}
 data(ChemicalManufacturingProcess)
 
 dfChem <- ChemicalManufacturingProcess
+<<<<<<< HEAD
 summary(dfChem)
 ```
 
+=======
+```
+
+(b) A small percentage of cells in the predictor set contain missing values. Use  an imputation function to fill in these missing values (e.g., see Sect. 3.8).  
+
+The number of missing values is low.  Furthermore, variances for many of the columns is low.  We therefore use mean imputation for the missing values.
+
+The data is marked by a great degree of multicollinearity. For example, 10 predictor pairs have correlations of .95 or higher.
+
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 ```{r}
 
 EHSummarize_MissingValues(dfChem)
@@ -189,6 +351,7 @@ dfChem2 <- EHPrepare_MissingValues_Imputation(dfChem)
 
 ```{r}
 
+<<<<<<< HEAD
 EHExplore_Multicollinearity(dfChem2, printHeatMap = FALSE, printHighest = TRUE)
 ```
 (c) Split the data into a training and a test set, pre-process the data, and  tune a model of your choice from this chapter. What is the optimal value  of the performance metric?  
@@ -204,6 +367,29 @@ i <- createDataPartition(dfChem2[,1], p = .8, list=FALSE)
 
 dfTrain <- dfChem2[i, ]
 dfTest <- dfChem2[-i, ]
+=======
+EHExplore_Multicollinearity(dfChem2, printHeatMap = FALSE, threshold=.95, printHighest = TRUE)
+```
+(c) Split the data into a training and a test set, pre-process the data, and  tune a model of your choice from this chapter. What is the optimal value of the performance metric?  
+
+We choose LASSO regression for our model.  LASSO has the advantage that it will eliminate unneeded indoicators, making for a more readable and intuitive model.
+
+In order to compare models, we will use the RMSE, which gives us a sense of the distribution of errors our model is generating.
+
+The RMSE on the training set is .40.
+
+```{r}
+
+dfChem3 <- EHPrepare_ScaleAllButTarget(dfChem2, "Yield")
+
+set.seed(042760)
+
+library(pls)
+i <- createDataPartition(dfChem3[,1], p = .8, list=FALSE)
+
+dfTrain <- dfChem3[i, ]
+dfTest <- dfChem3[-i, ]
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
 dfTrain2 <- dfTrain[,-1]
 dfTest2 <- dfTest[,-1]
@@ -215,6 +401,7 @@ library(glmnet)
 x <- data.matrix(dfTrain2)
 xtest <- data.matrix(dfTest2)
 
+<<<<<<< HEAD
 #We find the optimal lambda by performing k-fold cross validation:
 
 mcv <- cv.glmnet(x, yTrain, alpha = 0)
@@ -258,4 +445,63 @@ mdl$resample %>% names()
 
 ```
 
+=======
+mcv <- cv.glmnet(x, yTrain, alpha = 1)
+
+lambda1 <- mcv$lambda.min
+
+m10 <- glmnet(x, yTrain, alpha = 1, lambda = lambda1)
+
+print("Train")
+predictions <- predict(m10, as.matrix(dfTrain2))
+sqrt(mean((predictions - yTrain)^2))
+
+
+
+```
+
+(d) Predict the response for the test set. What is the value of the performance  metric and how does this compare with the resampled performance metric  on the training set?  
+
+On the test set, the RMSE is .57.  This is somewhat higher.
+
+```{r}
+
+print("Test")
+predictions <- predict(m10, xtest)
+sqrt(mean((predictions - yTest)^2))
+
+postResample(pred = predictions, obs = yTest)
+
+```
+
+(e) Which predictors are most important in the model you have trained? Do  either the biological or process predictors dominate the list?  
+
+As expected, the LASSO model eliminates a number of predictors from the model.  In all, only 13 predictors are preserved. The percentage of biological predictors preserved is higher than those of process, and they have the highest coefficents.  Therefore, they are more important. 
+
+```{r}
+library(broom)
+
+coef(m10)
+  
+```
+
+__*6.3f Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future  runs of the manufacturing process?*__
+
+
+
+```{r}
+
+
+zz <- tidy(m10) %>%
+  dplyr::select(term, estimate) |>
+  arrange(desc(abs(estimate)))
+zz
+  
+dfGo <- dfChem2 %>%
+  dplyr::select(BiologicalMaterial01, BiologicalMaterial02, BiologicalMaterial08, ManufacturingProcess01, BiologicalMaterial03, Yield)
+
+EHSummarize_StandardPlots(dfGo, "Yield")
+
+```
+>>>>>>> 4776189396fc481c6171679bc7c3ebb1f1dc1477
 
