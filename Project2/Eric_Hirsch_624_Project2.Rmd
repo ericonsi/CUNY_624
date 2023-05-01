@@ -1,0 +1,396 @@
+---
+title: "Eric_Hirsch_624_Project2"
+
+output:
+  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+
+library(tidyverse)
+library(EHData)
+library(gridExtra)
+library(caret)
+library(AppliedPredictiveModeling)
+library(randomForest)
+library(Cubist)
+library(readxl)
+
+```
+```{r}
+dfPH <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project2\\StudentData.xlsx"))
+dfPH_Eval <- as.data.frame(read_excel("D:\\RStudio\\CUNY_624\\Project2\\StudentEvaluation.xlsx"))
+
+ChangeNA <- function(df){
+  df <- df |>
+    mutate('Brand Code' = ifelse(is.na(df$'Brand Code'),"NA",df$'Brand Code'))
+  return (df)
+}
+
+dfPHa <- ChangeNA(dfPH)
+dfPH_Evala <- ChangeNA(dfPH_Eval)
+```
+### Data Summary and Preparation
+
+```{r}
+
+summary(dfPHa)
+str(dfPHa)
+```
+
+```{r}
+dfPH_Num <- dfPHa |>
+  dplyr::select(-"Brand Code")
+```
+
+#### Missing Values
+
+```{r}
+EHSummarize_MissingValues(dfPH_Num)
+
+mfr_flag <- ifelse(is.na(dfPH_Num$MFR),1,0)
+cor.test(dfPH_Num$PH, mfr_flag)
+
+```
+
+```{r}
+dfPH1 <- EHPrepare_MissingValues_Imputation(dfPHa, impute="median")
+```
+
+### Multicollinearity
+
+```{r}
+dfPH_Num1 <- dfPH1 |>
+  dplyr::select(-"Brand Code")
+
+a <- EHExplore_Multicollinearity(dfPH_Num1, threshold=.85, printHighest = TRUE)
+
+```
+
+The Density, Balling, Balling level and Alch Rel are all highly correlated with each other.  While we have seen that multicollinearity does not necessarily interfere with predictive power, it does impede inference.  Since we need to make a user-fiendly eplanatory document, we will eliminate some predictors so that inferences are more reliable.  In particular, we will remove Balling, since Balling level and Density carry most of its information.
+
+```{r}
+
+dfPH2 <- dfPH1 |>
+  dplyr::select(-Balling)
+
+```
+### Dummy variables
+
+```{r}
+
+
+dfPH3 <- EHPrepare_CreateDummies(dfPH2, "PH")
+
+```
+
+
+### Outliers, Distributions and Correlations 
+
+zeroes?  PH is normally-enough distributed.
+
+```{r}
+
+a <- EHSummarize_StandardPlots(dfPH3, "PH")
+
+```
+
+Regression
+
+```{r}
+
+library(MASS)
+set.seed(042760)
+a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
+
+```
+
+Remove influential records
+
+```{r}
+#devtools::install_github("ericonsi/EHData")
+#library(EHData)
+
+dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359))
+```
+
+Try other models
+
+```{r}
+
+set.seed(042760)
+
+i <- createDataPartition(dfPH4[,1], p = .8, list=FALSE)
+
+dfTrain <- dfPH4[i, ]
+dfTest <- dfPH4[-i, ]
+
+dfTrain2 <- dfTrain[,-24]
+dfTest2 <- dfTest[,-24]
+yTrain <- dfTrain[,24]
+yTest <- dfTest[,24]
+
+```
+
+
+1). Lasso
+
+```{r}
+library(glmnet)
+x <- data.matrix(dfTrain2)
+xtest <- data.matrix(dfTest2)
+
+mcv <- cv.glmnet(x, yTrain, alpha = 1)
+
+lambda1 <- mcv$lambda.min
+
+m10 <- glmnet(x, yTrain, alpha = 1, lambda = lambda1, preProc = c("center", "scale"))
+m10
+
+lassoPred <- predict(m10, xtest)
+postResample(pred =lassoPred, obs = yTest) 
+
+```
+
+2) Ridge
+```{r}
+
+library(glmnet)
+x <- data.matrix(dfTrain2)
+xtest <- data.matrix(dfTest2)
+
+mcv <- cv.glmnet(x, yTrain, alpha = 0)
+
+lambda1 <- mcv$lambda.min
+
+m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1, preProc = c("center", "scale"))
+m10
+
+ridgePred <- predict(m10, xtest)
+postResample(pred =ridgePred, obs = yTest) 
+
+```
+
+PLS
+
+```{r}
+
+ctrl <- trainControl(method = "cv", number = 10)
+
+model2 <- train(dfTrain2, yTrain, method = "pls", metric='Rsquared', tuneLength=50, trControl = ctrl, preProc = c("center", "scale"))
+model2
+
+plsPred <- predict(model2, dfTest2)
+postResample(pred =plsPred, obs = yTest) 
+
+```
+
+KNN
+```{r}
+set.seed(042760)
+knnModel <- train(x = dfTrain2, y = yTrain, method = "knn", preProc = c("center", "scale"), tuneLength = 10)
+knnModel
+
+knnPred <- predict(knnModel, newdata = dfTest2)
+postResample(pred = knnPred, obs = yTest) 
+
+```
+
+NN
+
+Decay = .04, size = 4.
+```{r}
+set.seed(042760)
+library(nnet)
+nn <- nnet(dfTrain2, yTrain,
+                size = 4,
+                decay = 0.04,
+                linout = TRUE,
+                trace = FALSE,
+                maxit = 500,
+                MaxNWts = 5 * (ncol(dfTrain2) + 1) +5 +1)
+nn
+
+nnPred <- predict(nn, newdata = dfTest2)
+postResample(pred = nnPred, obs = yTest)
+
+
+```
+
+MARS
+```{r}
+set.seed(042760)
+library(earth)
+mars <- earth(dfTrain2, yTrain)
+mars
+
+marsPred <- predict(mars, newdata = dfTest2)
+postResample(pred = marsPred, obs = yTest)
+```
+
+__4. SVM (linear and radial)__
+
+```{r}
+set.seed(042760)
+library(caret)
+
+svm_Radial <- train(dfTrain2, yTrain,
+                   method = "svmRadial",
+                   preProc = c("center","scale"),
+                   trControl = trainControl(method = "cv"))
+
+svm_Radial
+
+svmPredR <- predict(svm_Radial, newdata = dfTest2)
+postResample(pred = svmPredR, obs = yTest)
+
+print('')
+print('___________________________________________')
+print('')
+
+svm_Linear <- train(dfTrain2, yTrain,
+                   method = "svmLinear",
+                   preProc = c("center","scale"),
+                   tuneLength = 14,
+                   trControl = trainControl(method = "cv"))
+
+svm_Linear
+
+
+svmPredL <- predict(svm_Linear, newdata = dfTest2)
+postResample(pred = svmPredL, obs = yTest)
+
+
+```
+
+__1) Random Forest__
+
+```{r}
+set.seed(042760)
+rf <- randomForest(PH ~., data = dfTrain, importance = TRUE, ntree = 1000)
+rf
+
+rfPred <- predict(rf, newdata = dfTest2)
+postResample(pred =rfPred, obs = yTest) 
+```
+
+__2) Boosted__
+```{r}
+set.seed(042760)
+library(gbm)
+boosted <- gbm(PH ~., data = dfTrain)
+boosted
+
+boostPred <- predict(boosted, newdata = dfTest2)
+postResample(pred =boostPred, obs = yTest) 
+```
+
+__3) Cubist__
+```{r}
+
+set.seed(042760)
+library(Cubist)
+cubist <- cubist(dfTrain2, yTrain)
+cubist
+
+cubistPred <- predict(cubist,  newdata = dfTest2)
+postResample(pred = cubistPred, obs = yTest) 
+```
+Choosing the best model
+
+```{r}
+
+tab <- matrix(c("OLS Regression", .136, .43, "Lasso", .133, .43, "Ridge", .134, .43, "KNN", .125, .50, "NeuralNet", .120, .54, "MARS", .131, .45, "SVM-Linear", .134, .42,"SVM_Radial",.117,.56, "Random Forest", .099, .72, "Boosted", .132, .46, "Cubist", .133, .49), ncol=3, byrow=TRUE) 
+colnames(tab) <- c('Model','RMSE','RSquared')
+
+x <- tab[order(tab[,"RMSE"],decreasing=FALSE),]
+
+tab <- as.table(x)
+tab
+
+```
+
+
+
+Assessing variable importance
+
+```{r}
+
+dfPH4a <- EHPrepare_ScaleAllButTarget(dfPH4, "PH")
+aa <- EHModel_Regression_StandardLM(dfPH4a, "PH", xseed="042760")
+
+```
+
+```{r}
+
+  rimp <- as.data.frame(aa$coefficients)
+  colnames(rimp)[1] = "Overall"
+
+  rimp <- rimp |>
+    dplyr::arrange(desc(abs(Overall)))
+  head(rimp, 10)
+
+
+TopTenVarImp <- function(m)
+{
+  
+  imp <- as.data.frame(varImp(m, scale=FALSE)) |>
+    dplyr::arrange(desc(Overall))
+  head(imp, 10)
+  
+}
+  
+  TopTenVarImp(rf)
+  
+  srimp <- varImp(svm_Radial, scale = FALSE) 
+  srimp <- srimp$importance |> dplyr::arrange(desc(Overall))
+  head(srimp, 10)
+```
+
+```{r}
+  nnImp <- as.data.frame(varImp(nn))
+nnImp2 <- nnImp
+
+  dfPH4b <- dfPH4 |>
+    dplyr::select(-PH)
+  
+ xx <- (colnames(dfPH4b))
+ row.names(nnImp)=xx
+ 
+  nnImp <- nnImp |> dplyr::arrange(desc(Overall))
+  #head(nnImp, 10)
+ 
+```
+Decision Tree
+```{r}
+
+set.seed(042760)
+library(rpart)
+library(rpart.plot)
+
+rpart1 <- rpart(PH ~., data = dfPH4)
+rpart.plot(rpart1)
+
+rpart2 <- rpart(PH ~., data = dfPH4, minsplit=700)
+rpart.plot(rpart2)
+
+
+```
+
+```{r}
+
+dfPH_Imp <- dfPH4a |>
+  dplyr::select(PH, Mnf.Flow, Bowl.Setpoint, Usage.cont, Alch.Rel, Brand.Code_C )
+a <- EHSummarize_StandardPlots(dfPH_Imp, "PH")
+
+
+```
+
+```{r}
+q <- EHExplore_Multicollinearity(dfPH_Imp, threshold=.5, printHighest = TRUE)
+```
+
