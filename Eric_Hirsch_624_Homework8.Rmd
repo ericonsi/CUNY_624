@@ -280,8 +280,6 @@ svmImp <- varImp(nn) %>%
   arrange(desc(abs(Overall)))
 head(svmImp,10)
 
-
-
 ```
 
 
