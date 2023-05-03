@@ -35,7 +35,17 @@ ChangeNA <- function(df){
 dfPHa <- ChangeNA(dfPH)
 dfPH_Evala <- ChangeNA(dfPH_Eval)
 ```
-### Data Summary and Preparation
+#### Introduction
+
+ABC Beverage is facing new regulations requiring us to understand our manufacturing process, the predictive factors and be able to report to them our predictive model of PH.
+
+Below is the technical report detailing our examination of the data and creation of our PH model.
+
+#### Data Summary and Preparation
+
+The data consistent of 2571 beverage records, including PH (the target) and 32 possible predictors of PH. 32 of the predictors are numeric, and one (Brand) is character.  Many of the predictors have missing values.
+
+The exercise is to create a predictive model of PH based on this data.
 
 ```{r}
 
@@ -50,19 +60,28 @@ dfPH_Num <- dfPHa |>
 
 #### Missing Values
 
+A number of predictors have missing values; however, the only one of significance is MFR (8%).  The missing values do not appear to be correlated with each other, and records with missing MFR do not appear to be correlated with PH.  We therefore conclude that missingness is a relatively random phenomenon in this dataset and do a simple median imputation for all missing values.
+
+For the only character predictor, Brand, we will create a variable Brand_NA when we dummify it.
+
 ```{r}
 EHSummarize_MissingValues(dfPH_Num)
 
 mfr_flag <- ifelse(is.na(dfPH_Num$MFR),1,0)
+
+print("Correlation between MFR missingness and PH")
 cor.test(dfPH_Num$PH, mfr_flag)
 
 ```
 
 ```{r}
 dfPH1 <- EHPrepare_MissingValues_Imputation(dfPHa, impute="median")
+dfPH_Eval1 <- EHPrepare_MissingValues_Imputation(dfPH_Evala, impute="median")
 ```
 
 ### Multicollinearity
+
+There is some degree of multicollinearity in the database. In particular, Density, Balling, Balling level and Alch Rel are all highly correlated with each other.  While multicollinearity does not necessarily interfere with predictive power, it does impede inference.  Since we need to not only predict PH but understand our model, we will remove Balling, since Balling level and Density carry most of its information.
 
 ```{r}
 dfPH_Num1 <- dfPH1 |>
@@ -72,27 +91,31 @@ a <- EHExplore_Multicollinearity(dfPH_Num1, threshold=.85, printHighest = TRUE)
 
 ```
 
-The Density, Balling, Balling level and Alch Rel are all highly correlated with each other.  While we have seen that multicollinearity does not necessarily interfere with predictive power, it does impede inference.  Since we need to make a user-fiendly eplanatory document, we will eliminate some predictors so that inferences are more reliable.  In particular, we will remove Balling, since Balling level and Density carry most of its information.
-
 ```{r}
 
 dfPH2 <- dfPH1 |>
   dplyr::select(-Balling)
+dfPH_Eval2 <- dfPH_Eval1 |>
+  dplyr::select(-Balling)
 
 ```
-### Dummy variables
 
 ```{r}
 
 
 dfPH3 <- EHPrepare_CreateDummies(dfPH2, "PH")
+dfPH_Eval3 <- EHPrepare_CreateDummies(dfPH_Eval2, "PH")
 
 ```
 
 
-### Outliers, Distributions and Correlations 
+#### Outliers, Distributions and Correlations 
 
-zeroes?  PH is normally-enough distributed.
+PH is normally-enough distributed so we will not transform it.  We see some skewed distributions among other factors and may need to correct for that depending on our algorithm choice.  
+
+A number of factors have a wealth of disturbing zeroes (PSC, HydPressure1, etc.). Sometimes zeroes are a stand in for NA.  In a real world case we would use domain knowledge to assess the validity of these zeroes - however, since we don't know, we will assume they are legitimate values.
+
+A fair number of factors are correlated with PH - this bodes well for a predictive model.
 
 ```{r}
 
@@ -100,7 +123,13 @@ a <- EHSummarize_StandardPlots(dfPH3, "PH")
 
 ```
 
-Regression
+#### Exploratory Regression Model
+
+We run an ordinary least square regression to gain insight into our data.  We use the Step AIC algorithm which eliminates predictors based on improvements to AIC.
+
+A large number of factors remain in the model.  R-Squared is 41% - we hope to improve this with more powerful predictive algorithms. The model shows heteroskedasticity but it is not overwhelming. The QQ plot suggests a relatively normally distributed target.
+
+There are 3 influential records.  We will remove them.
 
 ```{r}
 
@@ -110,8 +139,6 @@ a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
 
 ```
 
-Remove influential records
-
 ```{r}
 
 #library(EHData)
@@ -119,7 +146,9 @@ Remove influential records
 dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359))
 ```
 
-Try other models
+#### Machine Learning Models
+
+We now test our data on 11 machine learning algorithms in order to determine the best predictive model.
 
 ```{r}
 
@@ -138,7 +167,7 @@ yTest <- dfTest[,24]
 ```
 
 
-1). Lasso
+__1). Lasso__
 
 ```{r}
 library(glmnet)
@@ -157,7 +186,7 @@ postResample(pred =lassoPred, obs = yTest)
 
 ```
 
-2) Ridge
+__2) Ridge__
 ```{r}
 
 library(glmnet)
@@ -176,7 +205,7 @@ postResample(pred =ridgePred, obs = yTest)
 
 ```
 
-PLS
+__3). PLS__
 
 ```{r}
 
@@ -190,7 +219,7 @@ postResample(pred =plsPred, obs = yTest)
 
 ```
 
-KNN
+__4.) KNN__
 ```{r}
 set.seed(042760)
 knnModel <- train(x = dfTrain2, y = yTrain, method = "knn", preProc = c("center", "scale"), tuneLength = 10)
@@ -201,7 +230,7 @@ postResample(pred = knnPred, obs = yTest)
 
 ```
 
-NN
+__5). Neural Net__
 
 Decay = .04, size = 4.
 ```{r}
@@ -222,7 +251,7 @@ postResample(pred = nnPred, obs = yTest)
 
 ```
 
-MARS
+__6.) MARS__
 ```{r}
 set.seed(042760)
 library(earth)
@@ -233,7 +262,7 @@ marsPred <- predict(mars, newdata = dfTest2)
 postResample(pred = marsPred, obs = yTest)
 ```
 
-__4. SVM (linear and radial)__
+__7.) and 8.) SVM (linear and radial)__
 
 ```{r}
 set.seed(042760)
@@ -268,7 +297,7 @@ postResample(pred = svmPredL, obs = yTest)
 
 ```
 
-__1) Random Forest__
+__9.) Random Forest__
 
 ```{r}
 set.seed(042760)
@@ -279,7 +308,7 @@ rfPred <- predict(rf, newdata = dfTest2)
 postResample(pred =rfPred, obs = yTest) 
 ```
 
-__2) Boosted__
+__10.) GBM__
 ```{r}
 set.seed(042760)
 library(gbm)
@@ -290,7 +319,7 @@ boostPred <- predict(boosted, newdata = dfTest2)
 postResample(pred =boostPred, obs = yTest) 
 ```
 
-__3) Cubist__
+__11.) Cubist__
 ```{r}
 
 set.seed(042760)
@@ -301,7 +330,9 @@ cubist
 cubistPred <- predict(cubist,  newdata = dfTest2)
 postResample(pred = cubistPred, obs = yTest) 
 ```
-Choosing the best model
+#### Choosing the best model
+
+The table below shows results for the 11 algorithm.  Random Forest is clearly the best choice.
 
 ```{r}
 
@@ -315,19 +346,22 @@ tab
 
 ```
 
+#### Assessing variable importance
 
-
-Assessing variable importance
+First we re-run our regression with scaled factors to get a baseline.
 
 ```{r}
 
 dfPH4a <- EHPrepare_ScaleAllButTarget(dfPH4, "PH")
-aa <- EHModel_Regression_StandardLM(dfPH4a, "PH", xseed="042760")
+aa <- EHModel_Regression_StandardLM(dfPH4a, "PH", xseed="042760", returnLM = TRUE, tests = FALSE, vif = FALSE)
 
 ```
 
+We compare the top ten factors in our regression with those of Random Forest and SVM_Radial (our second best performing model) and look for patterns.
+
 ```{r}
 
+print("Top 10 regression coefficients")
   rimp <- as.data.frame(aa$coefficients)
   colnames(rimp)[1] = "Overall"
 
@@ -344,29 +378,19 @@ TopTenVarImp <- function(m)
   head(imp, 10)
   
 }
-  
+print("Top 10 Random Forest factors")
   TopTenVarImp(rf)
   
+print("Top 10 SVM factors")
   srimp <- varImp(svm_Radial, scale = FALSE) 
   srimp <- srimp$importance |> dplyr::arrange(desc(Overall))
   head(srimp, 10)
 ```
+When we examine the most important predictors, not only in our Random Forest model but in SVM and Regression as well, we find that Mnf.Flow is the most important predictor, followed by Usage.cont and Bowl.Setpoint.  Alch.Rel, Filler.level and Brand (especially Brand C) are also factors. 
 
-```{r}
-  nnImp <- as.data.frame(varImp(nn))
-nnImp2 <- nnImp
+When we run an individual tree (see below) we can see that, at least for this tree, Mnf.Flow is the first node. While our Random Forest model aggregates many different trees, we can presume that many of them begin with Mnf.Flow.
 
-  dfPH4b <- dfPH4 |>
-    dplyr::select(-PH)
-  
- xx <- (colnames(dfPH4b))
- row.names(nnImp)=xx
- 
-  nnImp <- nnImp |> dplyr::arrange(desc(Overall))
-  #head(nnImp, 10)
- 
-```
-Decision Tree
+
 ```{r}
 
 set.seed(042760)
@@ -376,11 +400,13 @@ library(rpart.plot)
 rpart1 <- rpart(PH ~., data = dfPH4)
 rpart.plot(rpart1)
 
-rpart2 <- rpart(PH ~., data = dfPH4, minsplit=700)
-rpart.plot(rpart2)
+#rpart2 <- rpart(PH ~., data = dfPH4, minsplit=700)
+#rpart.plot(rpart2)
 
 
 ```
+
+When we re-examine the important predictors, we can see that they all have significant correlations with PH.  While the first three factors are also correlated with each other, the correlations are only about 50%. These are reassuring signs we have a robust model.
 
 ```{r}
 
@@ -393,5 +419,15 @@ a <- EHSummarize_StandardPlots(dfPH_Imp, "PH")
 
 ```{r}
 q <- EHExplore_Multicollinearity(dfPH_Imp, threshold=.5, printHighest = TRUE)
+```
+#### Conclusion
+
+We tested 11 machine learning on beverage data in order to predict PH. OUr final model is tree-based (Random Forest).  The Model R-Squared is 72%, which suggests that our predictions will tend to be in the ballpark but there is still quite a bit of room for small errors up and down.
+
+```{r}
+
+ww <- EHModel_Predict(rf, dfPH_Eval3, "PSC", writeFile = "Predictions.xlsx")
+
+
 ```
 
