@@ -133,6 +133,15 @@ There are 3 influential records.  We will remove them.
 
 ```{r}
 
+
+xformula <- 
+x <- EHPrepare_BoxCox(dfPH3, "Density")
+
+```
+
+
+```{r}
+
 library(MASS)
 
 set.seed(042760)
