@@ -131,14 +131,6 @@ A large number of factors remain in the model.  R-Squared is 41% - we hope to im
 
 There are 3 influential records.  We will remove them.
 
-```{r}
-
-
-xformula <- 
-x <- EHPrepare_BoxCox(dfPH3, "Density")
-
-```
-
 
 ```{r}
 
