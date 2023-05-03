@@ -817,6 +817,9 @@ determine the best predictive model.</p>
 <h4>Choosing the best model</h4>
 <p>The table below shows results for the 11 algorithm. Random Forest is
 clearly the best choice.</p>
+<p>It should be noted that R-Squareds were .05 higher for Random Forest
+and Support Vector Machines when PH underwent a boxcox transformation.
+However, this was not worth the difficulty of interpretability.</p>
 <pre><code>##   Model          RMSE  RSquared
 ## A Random Forest  0.099 0.72    
 ## B SVM_Radial     0.117 0.56    

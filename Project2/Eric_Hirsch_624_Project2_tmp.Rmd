@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```{r}
 
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(gridExtra)
 library(caret)
@@ -93,10 +93,7 @@ a <- EHExplore_Multicollinearity(dfPH_Num1, threshold=.85, printHighest = TRUE)
 
 ```{r}
 
-dfPH2 <- dfPH1 |>
-  dplyr::select(-Balling)
-dfPH_Eval2 <- dfPH_Eval1 |>
-  dplyr::select(-Balling)
+dfPH2 <- dfPH1 
 
 ```
 
@@ -123,6 +120,18 @@ a <- EHSummarize_StandardPlots(dfPH3, "PH")
 
 ```
 
+
+```{r}
+library(MASS)
+col="PH"
+
+
+
+dfPH3a <- EHPrepare_BoxCox(dfPH3, "PH")
+hist(dfPH3[,col], main=paste(col, "- Before"))
+
+```
+
 #### Exploratory Regression Model
 
 We run an ordinary least square regression to gain insight into our data.  We use the Step AIC algorithm which eliminates predictors based on improvements to AIC.
@@ -134,18 +143,16 @@ There are 3 influential records.  We will remove them.
 ```{r}
 
 library(MASS)
-
 set.seed(042760)
-a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
+a <-EHModel_Regression_StandardLM(dfPH3a, "PH", xseed="042760", returnLM=TRUE)
 
 ```
-
 
 ```{r}
 
 #library(EHData)
 
-dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359))
+dfPH4 <- dfPH3a
 ```
 
 #### Machine Learning Models
@@ -161,10 +168,10 @@ i <- createDataPartition(dfPH4[,1], p = .8, list=FALSE)
 dfTrain <- dfPH4[i, ]
 dfTest <- dfPH4[-i, ]
 
-dfTrain2 <- dfTrain[,-24]
-dfTest2 <- dfTest[,-24]
-yTrain <- dfTrain[,24]
-yTest <- dfTest[,24]
+dfTrain2 <- dfTrain[,-25]
+dfTest2 <- dfTest[,-25]
+yTrain <- dfTrain[,25]
+yTest <- dfTest[,25]
 
 ```
 
