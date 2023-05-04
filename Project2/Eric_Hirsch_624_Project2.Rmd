@@ -148,7 +148,9 @@ a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
 
 #library(EHData)
 
-dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359)) 
+dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3q, c(1094, 690, 2359)) 
+
+#write.csv(dfPH4,file="D:\\RStudio\\CUNY_624\\Project2\\Data.txt")
 ```
 
 #### Machine Learning Models
