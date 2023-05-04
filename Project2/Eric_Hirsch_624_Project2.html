@@ -359,6 +359,15 @@ pre code {
 </div>
 
 
+<pre><code>## * checking for file &#39;C:\Users\eric.hirsch\AppData\Local\Temp\RtmpU5J7aB\remotes2cd06ff2647d\ericonsi-EHData-ca2d0ce/DESCRIPTION&#39; ... OK
+## * preparing &#39;EHData&#39;:
+## * checking DESCRIPTION meta-information ... OK
+## * checking for LF line-endings in source and make files and shell scripts
+## * checking for empty or unneeded directories
+## Omitted &#39;LazyData&#39; from DESCRIPTION
+## * creating default NAMESPACE file
+## * building &#39;EHData_0.1.0.tar.gz&#39;
+## </code></pre>
 <div id="introduction" class="section level4">
 <h4>Introduction</h4>
 <p>ABC Beverage is facing new regulations requiring us to understand our
@@ -817,6 +826,9 @@ determine the best predictive model.</p>
 <h4>Choosing the best model</h4>
 <p>The table below shows results for the 11 algorithm. Random Forest is
 clearly the best choice.</p>
+<p>It should be noted that R-Squareds were .05 higher for Random Forest
+and Support Vector Machines when PH underwent a boxcox transformation.
+However, this was not worth the difficulty of interpretability.</p>
 <pre><code>##   Model          RMSE  RSquared
 ## A Random Forest  0.099 0.72    
 ## B SVM_Radial     0.117 0.56    
