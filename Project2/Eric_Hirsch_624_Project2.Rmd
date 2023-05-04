@@ -62,7 +62,7 @@ dfPH_Num <- dfPHa |>
 
 A number of predictors have missing values; however, the only one of significance is MFR (8%).  The missing values do not appear to be correlated with each other, and records with missing MFR do not appear to be correlated with PH.  We therefore conclude that missingness is a relatively random phenomenon in this dataset and do a simple median imputation for all missing values.
 
-There are missing target values - however, there are so few that we decide to impute them rather than lose them from the database.
+There are 4 missing target values as well - however, there are so few that we decide to impute them rather than lose them from the database.
 
 For the only character predictor, Brand, we will create a variable Brand_NA when we dummify it.
 
