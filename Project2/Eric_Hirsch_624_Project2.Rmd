@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```{r}
 
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(gridExtra)
 library(caret)
@@ -186,6 +186,7 @@ lambda1 <- mcv$lambda.min
 m10 <- glmnet(x, yTrain, alpha = 1, lambda = lambda1, preProc = c("center", "scale"))
 m10
 
+print("Test Metrics:")
 lassoPred <- predict(m10, xtest)
 postResample(pred =lassoPred, obs = yTest) 
 
@@ -205,6 +206,7 @@ lambda1 <- mcv$lambda.min
 m10 <- glmnet(x, yTrain, alpha = 0, lambda = lambda1, preProc = c("center", "scale"))
 m10
 
+print("Test Metrics:")
 ridgePred <- predict(m10, xtest)
 postResample(pred =ridgePred, obs = yTest) 
 
@@ -219,6 +221,7 @@ ctrl <- trainControl(method = "cv", number = 10)
 model2 <- train(dfTrain2, yTrain, method = "pls", metric='Rsquared', tuneLength=50, trControl = ctrl, preProc = c("center", "scale"))
 model2
 
+print("Test Metrics:")
 plsPred <- predict(model2, dfTest2)
 postResample(pred =plsPred, obs = yTest) 
 
@@ -230,6 +233,7 @@ set.seed(042760)
 knnModel <- train(x = dfTrain2, y = yTrain, method = "knn", preProc = c("center", "scale"), tuneLength = 10)
 knnModel
 
+print("Test Metrics:")
 knnPred <- predict(knnModel, newdata = dfTest2)
 postResample(pred = knnPred, obs = yTest) 
 
@@ -250,6 +254,7 @@ nn <- nnet(dfTrain2, yTrain,
                 MaxNWts = 5 * (ncol(dfTrain2) + 1) +5 +1)
 nn
 
+print("Test Metrics:")
 nnPred <- predict(nn, newdata = dfTest2)
 postResample(pred = nnPred, obs = yTest)
 
@@ -263,6 +268,7 @@ library(earth)
 mars <- earth(dfTrain2, yTrain)
 mars
 
+print("Test Metrics:")
 marsPred <- predict(mars, newdata = dfTest2)
 postResample(pred = marsPred, obs = yTest)
 ```
@@ -280,6 +286,7 @@ svm_Radial <- train(dfTrain2, yTrain,
 
 svm_Radial
 
+print("Test Metrics:")
 svmPredR <- predict(svm_Radial, newdata = dfTest2)
 postResample(pred = svmPredR, obs = yTest)
 
@@ -295,7 +302,7 @@ svm_Linear <- train(dfTrain2, yTrain,
 
 svm_Linear
 
-
+print("Test Metrics:")
 svmPredL <- predict(svm_Linear, newdata = dfTest2)
 postResample(pred = svmPredL, obs = yTest)
 
@@ -309,18 +316,32 @@ set.seed(042760)
 rf <- randomForest(PH ~., data = dfTrain, importance = TRUE, ntree = 1000)
 rf
 
+print("Test Metrics:")
 rfPred <- predict(rf, newdata = dfTest2)
 postResample(pred =rfPred, obs = yTest) 
 ```
 
 __10.) GBM__
+
+Depth = 4, ntrees = 10000, shrinkage = .007
 ```{r}
 set.seed(042760)
 library(gbm)
-boosted <- gbm(PH ~., data = dfTrain)
+boosted <- gbm(
+  formula = PH ~., data = dfTrain,
+  distribution = "gaussian",
+  n.trees = 10000,
+  interaction.depth = 4,
+  shrinkage = 0.007,
+  cv.folds = 10,
+  n.cores = NULL, 
+  verbose = FALSE
+  ) 
 boosted
+print(paste("Number of trees:", boosted$n.trees))
 
-boostPred <- predict(boosted, newdata = dfTest2)
+print("Test Metrics:")
+boostPred <- predict(boosted, n.trees = boosted$n.trees, newdata = dfTest2)
 postResample(pred =boostPred, obs = yTest) 
 ```
 
@@ -332,6 +353,7 @@ library(Cubist)
 cubist <- cubist(dfTrain2, yTrain)
 cubist
 
+print("Test Metrics:")
 cubistPred <- predict(cubist,  newdata = dfTest2)
 postResample(pred = cubistPred, obs = yTest) 
 ```
@@ -343,7 +365,7 @@ It should be noted that R-Squareds were .05 higher for Random Forest and Support
 
 ```{r}
 
-tab <- matrix(c("OLS Regression", .136, .43, "Lasso", .133, .43, "Ridge", .134, .43, "KNN", .125, .50, "NeuralNet", .120, .54, "MARS", .131, .45, "SVM-Linear", .134, .42,"SVM_Radial",.117,.56, "Random Forest", .099, .72, "Boosted", .132, .46, "Cubist", .133, .49), ncol=3, byrow=TRUE) 
+tab <- matrix(c("OLS Regression", .136, .43, "Lasso", .133, .43, "Ridge", .134, .43, "KNN", .125, .50, "NeuralNet", .120, .54, "MARS", .131, .45, "SVM-Linear", .134, .42,"SVM_Radial",.117,.56, "Random Forest", .099, .72, "Boosted", .106, .64, "Cubist", .133, .49), ncol=3, byrow=TRUE) 
 colnames(tab) <- c('Model','RMSE','RSquared')
 
 x <- tab[order(tab[,"RMSE"],decreasing=FALSE),]
@@ -387,6 +409,17 @@ TopTenVarImp <- function(m)
 }
 print("Top 10 Random Forest factors")
   TopTenVarImp(rf)
+  
+print("Top 10 GBM factors")
+library(gbm)
+par(mar = c(5, 8, 1, 1))
+summary.gbm(
+  boosted, 
+  cBars = 10,
+  method = relative.influence, # also can use permutation.test.gbm
+  las = 2
+  )
+
   
 print("Top 10 SVM factors")
   srimp <- varImp(svm_Radial, scale = FALSE) 
