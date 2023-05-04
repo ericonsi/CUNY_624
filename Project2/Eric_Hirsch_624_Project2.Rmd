@@ -115,7 +115,7 @@ dfPH_Eval3 <- EHPrepare_CreateDummies(dfPH_Eval2, "PH")
 
 PH is normally-enough distributed so we will not transform it.  We see some skewed distributions among other factors and may need to correct for that depending on our algorithm choice.  
 
-A number of factors have a wealth of disturbing zeroes (PSC, HydPressure1, etc.). Sometimes zeroes are a stand in for NA.  In a real world case we would use domain knowledge to assess the validity of these zeroes - however, since we don't know, we will assume they are legitimate values.
+A number of factors have a wealth of disturbing zeroes (PSC, HydPressure1, etc.). Sometimes zeroes are a stand in for NA.  In a real world case we would use domain knowledge to assess the validity of these zeroes - however, since we don't know, we will assume they are legitimate values. While there are high and low values, these values come in gorups - therefore, we will not remove outliers.
 
 A fair number of factors are correlated with PH - this bodes well for a predictive model.
 
@@ -148,7 +148,7 @@ a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
 
 #library(EHData)
 
-dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359))
+dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359)) 
 ```
 
 #### Machine Learning Models
@@ -345,6 +345,7 @@ boostPred <- predict(boosted, n.trees = boosted$n.trees, newdata = dfTest2)
 postResample(pred =boostPred, obs = yTest) 
 ```
 
+
 __11.) Cubist__
 ```{r}
 
@@ -359,9 +360,9 @@ postResample(pred = cubistPred, obs = yTest)
 ```
 #### Choosing the best model
 
-The table below shows results for the 11 algorithm.  Random Forest is clearly the best choice.
+The table below shows results for the 11 algorithms.  Random Forest is clearly the best performer.
 
-It should be noted that R-Squareds were .05 higher for Random Forest and Support Vector Machines when PH underwent a boxcox transformation.  However, this was not worth the difficulty of interpretability.
+It should be noted that R-Squareds were .05 higher for several agorithms when PH underwent a boxcox transformation.  However, this was not worth the difficulty of interpretability.
 
 ```{r}
 
@@ -386,7 +387,7 @@ aa <- EHModel_Regression_StandardLM(dfPH4a, "PH", xseed="042760", returnLM = TRU
 
 ```
 
-We compare the top ten factors in our regression with those of Random Forest and SVM_Radial (our second best performing model) and look for patterns.
+We compare the top ten factors in our regression with those of Random Forest, SVM_Radial and GBM and look for patterns.
 
 ```{r}
 
@@ -426,7 +427,9 @@ print("Top 10 SVM factors")
   srimp <- srimp$importance |> dplyr::arrange(desc(Overall))
   head(srimp, 10)
 ```
-When we examine the most important predictors, not only in our Random Forest model but in SVM and Regression as well, we find that Mnf.Flow is the most important predictor, followed by Usage.cont and Bowl.Setpoint.  Alch.Rel, Filler.level and Brand (especially Brand C) are also factors. 
+When we examine the most important predictors, not only in our Random Forest model but in the other higher performing models as well, we find that Mnf.Flow is the most important predictor, followed by Usage.cont and Bowl.Setpoint.  Alch.Rel, Filler.level and Brand (especially Brand C) are also factors. 
+
+Now we can use some tools that might give us insight into how these variables operate.
 
 When we run an individual tree (see below) we can see that, at least for this tree, Mnf.Flow is the first node. While our Random Forest model aggregates many different trees, we can presume that many of them begin with Mnf.Flow.
 
@@ -446,11 +449,41 @@ rpart.plot(rpart1)
 
 ```
 
-When we re-examine the important predictors, we can see that they all have significant correlations with PH.  While the first three factors are also correlated with each other, the correlations are only about 50%. These are reassuring signs we have a robust model.
+We can also examine pdp plots.  In this case, we will use our boosted model (our second best model), because the tree already gives us insight with respect to the rf model.
+
+```{r, figures-side, fig.show="hold", out.width="25%"}
+#par(mfrow=c(2,2), mar = c(2, 2, .1, .1))
+```
+```{r}
+
+library(pdp)
+
+p1 <- boosted %>% 
+partial(pred.var = "Mnf.Flow", n.trees=10000 ) %>%
+plotPartial(smooth = TRUE, lwd = 2, ylab = expression(f(lstat)))
+
+p2 <- boosted %>% 
+partial(pred.var = "Usage.cont", n.trees=10000, ) %>%
+plotPartial(smooth = TRUE, lwd = 2, ylab = expression(f(lstat)))
+
+p3 <- boosted %>% 
+partial(pred.var = "Oxygen.Filler", n.trees=10000, ) %>%
+plotPartial(smooth = TRUE, lwd = 2, ylab = expression(f(lstat)))
+
+p4 <- boosted %>% 
+partial(pred.var = "Alch.Rel", n.trees=10000, ) %>%
+plotPartial(smooth = TRUE, lwd = 2, ylab = expression(f(lstat)))
+
+grid.arrange(p1, p2, p3, p4, ncol=2)
+```
+
+The pdp plots from the boosted model provide some confirmation of the tree model. Mnf.Flow breaks at -.50 and at -.100, Usage.cont at 23, and Alch.rel at 7.6. 
+
+Pdp plots don't necessarily capture the affects of interactions.  When we re-examine the most important predictors from our rf model, we can see that they all have significant correlations with PH.  In addition, while the first three factors are also correlated with each other, the correlations are only about 50%. These are reassuring signs we have a robust model.  However, we would want to understand these interactions better before making further statements about variable importance.
 
 ```{r}
 
-dfPH_Imp <- dfPH4a |>
+dfPH_Imp <- dfPH4 |>
   dplyr::select(PH, Mnf.Flow, Bowl.Setpoint, Usage.cont, Alch.Rel, Brand.Code_C )
 a <- EHSummarize_StandardPlots(dfPH_Imp, "PH")
 
