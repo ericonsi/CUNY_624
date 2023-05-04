@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```{r}
 
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData", force=TRUE)
+devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(gridExtra)
 library(caret)
@@ -43,9 +43,8 @@ Below is the technical report detailing our examination of the data and creation
 
 #### Data Summary and Preparation
 
-The data consistent of 2571 beverage records, including PH (the target) and 32 possible predictors of PH. 32 of the predictors are numeric, and one (Brand) is character.  Many of the predictors have missing values.
+The data consists of 2571 beverage records, including PH (the target) and 32 possible predictors of PH. 31 of the predictors are numeric, and one (Brand) is character.  Many of the predictors have missing values.
 
-The exercise is to create a predictive model of PH based on this data.
 
 ```{r}
 
@@ -113,9 +112,9 @@ dfPH_Eval3 <- EHPrepare_CreateDummies(dfPH_Eval2, "PH")
 
 #### Outliers, Distributions and Correlations 
 
-PH is normally-enough distributed so we will not transform it.  We see some skewed distributions among other factors and may need to correct for that depending on our algorithm choice.  
+PH is normally-enough distributed so we will not transform it at this point.  We see some skewed distributions among some of the predictors and may need to correct for that depending on our algorithm choice.  
 
-A number of factors have a wealth of disturbing zeroes (PSC, HydPressure1, etc.). Sometimes zeroes are a stand in for NA.  In a real world case we would use domain knowledge to assess the validity of these zeroes - however, since we don't know, we will assume they are legitimate values. While there are high and low values, these values come in gorups - therefore, we will not remove outliers.
+A number of factors have a wealth of disturbing zeroes (PSC, HydPressure1, etc.). Sometimes zeroes are a stand in for NA.  In a real world case we would use domain knowledge to assess the validity of these zeroes - however, since we don't know, we will assume they are legitimate values. While there are high and low values, these values come in groups - therefore, we will not remove outliers but we will run a regression to check for influential points.
 
 A fair number of factors are correlated with PH - this bodes well for a predictive model.
 
@@ -129,7 +128,7 @@ a <- EHSummarize_StandardPlots(dfPH3, "PH")
 
 We run an ordinary least square regression to gain insight into our data.  We use the Step AIC algorithm which eliminates predictors based on improvements to AIC.
 
-A large number of factors remain in the model.  R-Squared is 41% - we hope to improve this with more powerful predictive algorithms. The model shows heteroskedasticity but it is not overwhelming. The QQ plot suggests a relatively normally distributed target.
+A large number of factors remain in the model.  R-Squared is 41% - we hope to improve this with more powerful predictive algorithms. The model shows heteroskedasticity, so we will perform a boxcox on PH. The QQ plot suggests a relatively normally distributed target.
 
 There are 3 influential records.  We will remove them.
 
@@ -145,10 +144,26 @@ a <-EHModel_Regression_StandardLM(dfPH3, "PH", xseed="042760", returnLM=TRUE)
 
 
 ```{r}
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
 
-#library(EHData)
+dfPH4a <- EHPrepare_RemoveRecordsByRowNumber(dfPH3, c(1094, 690, 2359))
+xformula=PH~1
 
-dfPH4 <- EHPrepare_RemoveRecordsByRowNumber(dfPH3q, c(1094, 690, 2359)) 
+df <- dfPH4a
+col="PH"
+  
+  hist(df[,col], main=paste(col, "- Before"))
+  
+  b <- boxcox(lm(PH~1., dfPH4a))
+  lambda <- b$x[which.max(b$y)]
+  df[, col] <- (df[,col] ^ lambda - 1) / lambda
+  xq <- df[,col]
+  
+  hist(df[,col], main=paste(col, "- After, lambda =", lambda))
+
+dfPH4 <- dfPH4a %>%
+  mutate(PH=xq)
 
 #write.csv(dfPH4,file="D:\\RStudio\\CUNY_624\\Project2\\Data.txt")
 ```
@@ -243,16 +258,16 @@ postResample(pred = knnPred, obs = yTest)
 
 __5). Neural Net__
 
-Decay = .04, size = 4.
+Decay = .04, size = 3.
 ```{r}
 set.seed(042760)
 library(nnet)
 nn <- nnet(dfTrain2, yTrain,
-                size = 4,
+                size = 3,
                 decay = 0.04,
                 linout = TRUE,
                 trace = FALSE,
-                maxit = 500,
+                maxit = 5000,
                 MaxNWts = 5 * (ncol(dfTrain2) + 1) +5 +1)
 nn
 
@@ -362,16 +377,14 @@ postResample(pred = cubistPred, obs = yTest)
 ```
 #### Choosing the best model
 
-The table below shows results for the 11 algorithms.  Random Forest is clearly the best performer.
-
-It should be noted that R-Squareds were .05 higher for several agorithms when PH underwent a boxcox transformation.  However, this was not worth the difficulty of interpretability.
+The table below shows results for the 11 algorithms plus OLS.  Random Forest is clearly the best performer.
 
 ```{r}
 
-tab <- matrix(c("OLS Regression", .136, .43, "Lasso", .133, .43, "Ridge", .134, .43, "KNN", .125, .50, "NeuralNet", .120, .54, "MARS", .131, .45, "SVM-Linear", .134, .42,"SVM_Radial",.117,.56, "Random Forest", .099, .72, "Boosted", .106, .64, "Cubist", .133, .49), ncol=3, byrow=TRUE) 
-colnames(tab) <- c('Model','RMSE','RSquared')
+tab <- matrix(c("K", "OLS Regression", 1.15, .43, "H", "Lasso", 1.13, .43, "J", "Ridge", 1.14, .43, "I", "PLS", 1.13, .43, "E", "KNN", 1.06, .50, "D", "NeuralNet", 1.05, .51, "G","MARS", 1.11, .45, "L", "SVM-Linear", 1.15, .38, "C", "SVM_Radial",.99,.57, "A", "Random Forest", .84, .72, "B", "GBM", .90, .64, "F", "Cubist", 1.13, .48), ncol=4, byrow=TRUE) 
+colnames(tab) <- c("Rank",'Model','RMSE','RSquared')
 
-x <- tab[order(tab[,"RMSE"],decreasing=FALSE),]
+x <- tab[order(tab[,"Rank"],decreasing=FALSE),]
 
 tab <- as.table(x)
 tab
@@ -384,8 +397,8 @@ First we re-run our regression with scaled factors to get a baseline.
 
 ```{r}
 
-dfPH4a <- EHPrepare_ScaleAllButTarget(dfPH4, "PH")
-aa <- EHModel_Regression_StandardLM(dfPH4a, "PH", xseed="042760", returnLM = TRUE, tests = FALSE, vif = FALSE)
+dfPH4z <- EHPrepare_ScaleAllButTarget(dfPH4, "PH")
+aa <- EHModel_Regression_StandardLM(dfPH4z, "PH", xseed="042760", returnLM = TRUE, tests = FALSE, vif = FALSE)
 
 ```
 
@@ -501,7 +514,8 @@ We tested 11 machine learning on beverage data in order to predict PH. OUr final
 
 ```{r}
 
-ww <- EHModel_Predict(rf, dfPH_Eval3, "PSC", writeFile = "Predictions.xlsx")
+#In new model, would need to reverse the boxcox
+#ww <- EHModel_Predict(rf, dfPH_Eval3, "PSC", writeFile = "Predictions.xlsx")
 
 
 ```
